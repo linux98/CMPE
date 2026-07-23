@@ -359,15 +359,40 @@
         const loadingToken = CMPE_LOADING.start(action);
         try {
           return await new Promise((resolve, reject) => {
+            let settled = false;
+            const timeoutId = window.setTimeout(() => {
+              if (settled) return;
+              settled = true;
+              reject({
+                code: 'ERR_REQUEST_TIMEOUT',
+                message: 'ระบบใช้เวลาตอบสนองนานกว่าปกติ กรุณาลองใหม่อีกครั้ง'
+              });
+            }, 35000);
             google.script.run
               .withSuccessHandler((response) => {
+                if (settled) return;
+                settled = true;
+                window.clearTimeout(timeoutId);
+                if (!response || typeof response !== 'object') {
+                  reject({
+                    code: 'ERR_EMPTY_RESPONSE',
+                    message: 'ระบบไม่ได้รับผลลัพธ์จากเซิร์ฟเวอร์ กรุณาลองใหม่อีกครั้ง'
+                  });
+                  return;
+                }
                 if (response.success) {
                   resolve(response.data);
                 } else {
-                  reject(response.error);
+                  reject(response.error || {
+                    code: 'ERR_UNKNOWN_RESPONSE',
+                    message: 'ระบบไม่สามารถประมวลผลคำขอนี้ได้'
+                  });
                 }
               })
               .withFailureHandler((err) => {
+                if (settled) return;
+                settled = true;
+                window.clearTimeout(timeoutId);
                 reject({ code: 'ERR_NETWORK_FAILURE', message: err.toString() });
               })
               .apiDispatcher({

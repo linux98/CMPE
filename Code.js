@@ -102,6 +102,117 @@ function doGet(e) {
   return output;
 }
 
+function rebuildRegistrationDisplayLookup_() {
+  const spreadsheet = SpreadsheetApp.openById(CMPE_ENVIRONMENT.getSpreadsheetId());
+  const readRows = sheetName => {
+    const sheet = spreadsheet.getSheetByName(sheetName);
+    if (!sheet || sheet.getLastRow() <= 1) return [];
+    const values = sheet.getDataRange().getValues();
+    const headers = values[0].map(String);
+    const statusIndex = headers.indexOf("recordStatus");
+    return values.slice(1).filter(row =>
+      statusIndex < 0 || row[statusIndex] !== "DELETED"
+    ).map(row => headers.reduce((object, header, index) => {
+      if (header) object[header] = row[index];
+      return object;
+    }, {}));
+  };
+  const toMap = (rows, idField, valueFactory) => rows.reduce((map, row) => {
+    if (row[idField]) map[row[idField]] = valueFactory(row);
+    return map;
+  }, {});
+  const lookup = {
+    configs: toMap(readRows("competition_category_configs"), "competitionCategoryConfigId",
+      row => [row.categoryId || "", row.educationLevelId || ""]),
+    categories: toMap(readRows("competition_categories"), "categoryId",
+      row => row.nameTh || row.nameEn || ""),
+    competitions: toMap(readRows("competitions"), "competitionId",
+      row => row.nameTh || row.nameEn || ""),
+    schools: toMap(readRows("schools"), "schoolId",
+      row => row.nameTh || row.nameEn || ""),
+    levels: toMap(readRows("education_levels"), "educationLevelId",
+      row => row.nameTh || row.nameEn || "")
+  };
+  const properties = PropertiesService.getScriptProperties();
+  properties.setProperties({
+    REG_DISPLAY_CONFIGS: JSON.stringify(lookup.configs),
+    REG_DISPLAY_CATEGORIES: JSON.stringify(lookup.categories),
+    REG_DISPLAY_COMPETITIONS: JSON.stringify(lookup.competitions),
+    REG_DISPLAY_SCHOOLS: JSON.stringify(lookup.schools),
+    REG_DISPLAY_LEVELS: JSON.stringify(lookup.levels),
+    REG_DISPLAY_BUILT_AT: new Date().toISOString()
+  }, false);
+  return {
+    success: true,
+    builtAt: properties.getProperty("REG_DISPLAY_BUILT_AT"),
+    counts: {
+      configs: Object.keys(lookup.configs).length,
+      categories: Object.keys(lookup.categories).length,
+      competitions: Object.keys(lookup.competitions).length,
+      schools: Object.keys(lookup.schools).length,
+      levels: Object.keys(lookup.levels).length
+    }
+  };
+}
+
+function rebuildRegistrationDisplayLookup() {
+  return rebuildRegistrationDisplayLookup_();
+}
+
+function getRegistrationDisplayLookup_() {
+  const properties = PropertiesService.getScriptProperties();
+  const parse = key => {
+    try {
+      return JSON.parse(properties.getProperty(key) || "{}");
+    } catch (error) {
+      return {};
+    }
+  };
+  const defaultConfigs = {};
+  ["EVT-2569-AREA", "EVT-2569-CLUSTER", "EVT-2568-HISTORY"].forEach(eventId => {
+    [1, 2, 3, 4].forEach(itemNumber => {
+      defaultConfigs[`CONFIG-${eventId}-${itemNumber}`] = [
+        itemNumber <= 3 ? "CAT-1" : "CAT-2",
+        "LVL-SEC"
+      ];
+    });
+  });
+  const defaultSchools = {
+    "SCH-SAKON-1": "โรงเรียนสกลนครพัฒนศึกษา",
+    "SCH-SAKON-2": "โรงเรียนธาตุนารายณ์วิทยา",
+    "SCH-SAKON-3": "โรงเรียนพังโคนวิทยาคม",
+    "SCH-SAKON-4": "โรงเรียนวานรนิวาสศึกษา",
+    "SCH-SAKON-5": "โรงเรียนสว่างแดนดินวิทยา",
+    "SCH-SAKON-6": "โรงเรียนกุสุมาลย์พิทยาคม",
+    "SCH-SAKON-7": "โรงเรียนคำตากล้าราชประชาสงเคราะห์",
+    "SCH-SAKON-8": "โรงเรียนอากาศอำนวยศึกษา",
+    "SCH-SAKON-9": "โรงเรียนพรรณานิคมพิทยาคม",
+    "SCH-SAKON-10": "โรงเรียนเต่างอยพัฒนศึกษา",
+    "SCH-SAKON-11": "โรงเรียนโคกศรีวิทยาคม",
+    "SCH-SAKON-12": "โรงเรียนนิคมน้ำอูนศึกษา",
+    "SCH-SAKON-13": "โรงเรียนเจริญศิลป์พิทยาคม",
+    "SCH-SAKON-14": "โรงเรียนภูพานวิทยา",
+    "SCH-SAKON-15": "โรงเรียนโพนนาแก้วศึกษา"
+  };
+  return {
+    configs: Object.assign(defaultConfigs, parse("REG_DISPLAY_CONFIGS")),
+    categories: Object.assign({
+      "CAT-1": "ภาษาไทย",
+      "CAT-2": "คณิตศาสตร์"
+    }, parse("REG_DISPLAY_CATEGORIES")),
+    competitions: Object.assign({
+      "EVT-2569-AREA": "งานศิลปหัตถกรรมนักเรียน ระดับเขตพื้นที่การศึกษา ปีการศึกษา 2569",
+      "EVT-2569-CLUSTER": "การแข่งขันทักษะวิชาการระดับสหวิทยาเขต ปีการศึกษา 2569",
+      "EVT-2568-HISTORY": "งานแข่งขันทักษะวิชาการ ปีการศึกษา 2568 (ประวัติย้อนหลัง)"
+    }, parse("REG_DISPLAY_COMPETITIONS")),
+    schools: Object.assign(defaultSchools, parse("REG_DISPLAY_SCHOOLS")),
+    levels: Object.assign({
+      "LVL-SEC": "ระดับมัธยมศึกษา"
+    }, parse("REG_DISPLAY_LEVELS")),
+    builtAt: properties.getProperty("REG_DISPLAY_BUILT_AT") || ""
+  };
+}
+
 function jsonOutput_(value) {
   return ContentService.createTextOutput(JSON.stringify(value))
     .setMimeType(ContentService.MimeType.JSON);
@@ -724,43 +835,7 @@ function apiDispatcher(requestEnvelope) {
         const list = requestedSchoolId
           ? regRepo.findBySchool(requestedSchoolId, tenantId)
           : (canReadTenant ? regRepo.findAll(tenantId) : []);
-        // Build the presentation model from one spreadsheet connection. This
-        // avoids repeated openById calls while resolving human-readable names.
-        const displaySpreadsheet = SpreadsheetApp.openById(CMPE_ENVIRONMENT.getSpreadsheetId());
-        const readDisplayRows = (sheetName, tenantMode) => {
-          const sheet = displaySpreadsheet.getSheetByName(sheetName);
-          if (!sheet || sheet.getLastRow() <= 1) return [];
-          const values = sheet.getDataRange().getValues();
-          const headers = values[0].map(String);
-          const tenantIndex = headers.indexOf("tenantId");
-          const recordStatusIndex = headers.indexOf("recordStatus");
-          return values.slice(1).filter(row => {
-            if (recordStatusIndex >= 0 && row[recordStatusIndex] === "DELETED") return false;
-            if (tenantIndex < 0 || tenantMode === "all") return true;
-            const rowTenant = String(row[tenantIndex] || "");
-            if (tenantMode === "tenantOrGlobal") {
-              return rowTenant === tenantId || rowTenant === "SYSTEM" || !rowTenant;
-            }
-            return rowTenant === tenantId;
-          }).map(row => headers.reduce((object, header, index) => {
-            if (header) object[header] = row[index];
-            return object;
-          }, {}));
-        };
-        const configs = readDisplayRows("competition_category_configs", "tenant");
-        const categories = readDisplayRows("competition_categories", "tenantOrGlobal");
-        const competitions = readDisplayRows("competitions", "tenant");
-        const schools = readDisplayRows("schools", "tenant");
-        const educationLevels = readDisplayRows("education_levels", "all");
-        const indexBy = (rows, key) => rows.reduce((map, row) => {
-          map[row[key]] = row;
-          return map;
-        }, {});
-        const configById = indexBy(configs, "competitionCategoryConfigId");
-        const categoryById = indexBy(categories, "categoryId");
-        const competitionById = indexBy(competitions, "competitionId");
-        const schoolById = indexBy(schools, "schoolId");
-        const levelById = indexBy(educationLevels, "educationLevelId");
+        const lookup = getRegistrationDisplayLookup_();
         const statusLabels = {
           DRAFT: "ฉบับร่าง",
           SUBMITTED: "ส่งใบสมัครแล้ว",
@@ -776,19 +851,19 @@ function apiDispatcher(requestEnvelope) {
           DISQUALIFIED: "ถูกตัดสิทธิ์"
         };
         const viewList = list.map(registration => {
-          const config = configById[registration.competitionCategoryConfigId] || {};
-          const category = categoryById[config.categoryId] || {};
-          const competition = competitionById[registration.competitionId] || {};
-          const school = schoolById[registration.schoolId] || {};
-          const level = levelById[config.educationLevelId] || {};
+          const config = lookup.configs[registration.competitionCategoryConfigId] || [];
+          const categoryName = lookup.categories[config[0]] || "";
+          const competitionName = lookup.competitions[registration.competitionId] || "";
+          const schoolName = lookup.schools[registration.schoolId] || "";
+          const levelName = lookup.levels[config[1]] || "";
           return Object.assign({}, registration, {
             registrationDisplay: registration.registrationNumber
               ? `ใบสมัครเลขที่ ${registration.registrationNumber}`
               : "ใบสมัครที่ยังไม่ออกเลข",
-            activityNameTh: category.nameTh || "กิจกรรมการแข่งขัน",
-            competitionNameTh: competition.nameTh || "การแข่งขันทักษะวิชาการ",
-            schoolNameTh: school.nameTh || "ไม่พบชื่อโรงเรียน",
-            educationLevelNameTh: level.nameTh || "ระดับมัธยมศึกษา",
+            activityNameTh: categoryName || "กิจกรรมการแข่งขัน",
+            competitionNameTh: competitionName || "การแข่งขันทักษะวิชาการ",
+            schoolNameTh: schoolName || "โรงเรียนในสังกัด",
+            educationLevelNameTh: levelName || "ระดับมัธยมศึกษา",
             statusLabelTh: statusLabels[registration.registrationStatus] || registration.registrationStatus
           });
         });
