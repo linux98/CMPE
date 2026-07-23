@@ -5,6 +5,15 @@
 
 const CMPE_UTILITIES = {
   /**
+   * google.script.run cannot transport Date instances or class prototypes.
+   * Normalize every API payload once at the boundary so all endpoints return
+   * transport-safe primitives, arrays and plain objects.
+   */
+  toJsonSafe(value) {
+    if (value === undefined) return null;
+    return JSON.parse(JSON.stringify(value));
+  },
+  /**
    * Generates a standard cryptographically secure UUIDv4
    */
   generateUuid() {
@@ -51,7 +60,7 @@ const CMPE_UTILITIES = {
     return {
       success: true,
       requestId: requestId || this.generateUuid(),
-      data: data,
+      data: this.toJsonSafe(data),
       meta: {
         serverTimestamp: new Date().toISOString(),
         rowVersion: rowVersion
@@ -69,7 +78,7 @@ const CMPE_UTILITIES = {
       error: {
         code: code || "ERR_DOMAIN_000",
         message: message || "An unexpected error occurred.",
-        details: details
+        details: this.toJsonSafe(details)
       }
     };
   },

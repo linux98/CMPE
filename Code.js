@@ -314,6 +314,38 @@ function assertNoActiveReferences_(sheetName, fieldName, value, tenantId, label)
   }
 }
 
+function getCatalogRevision_() {
+  const properties = PropertiesService.getScriptProperties();
+  return properties.getProperty("CATALOG_CACHE_REVISION") || "1";
+}
+
+function invalidateCatalogCache_() {
+  PropertiesService.getScriptProperties().setProperty(
+    "CATALOG_CACHE_REVISION",
+    String(Date.now())
+  );
+}
+
+function cachedCatalogRead_(namespace, tenantId, builder, ttlSeconds) {
+  const revision = getCatalogRevision_();
+  const digest = Utilities.base64EncodeWebSafe(
+    Utilities.computeDigest(
+      Utilities.DigestAlgorithm.SHA_256,
+      revision + ":" + tenantId + ":" + namespace,
+      Utilities.Charset.UTF_8
+    )
+  ).slice(0, 36);
+  const key = "catalog:" + digest;
+  const cache = CacheService.getScriptCache();
+  const cached = cache.get(key);
+  if (cached) return JSON.parse(cached);
+  const value = CMPE_UTILITIES.toJsonSafe(builder());
+  const serialized = JSON.stringify(value);
+  // Script cache values are limited to 100 KB. Large responses bypass cache.
+  if (serialized.length < 90000) cache.put(key, serialized, ttlSeconds || 120);
+  return value;
+}
+
 /**
  * Universal API Dispatcher (Section 13: API Contract)
  * Handles all incoming browser client API execution requests.
@@ -336,6 +368,13 @@ function apiDispatcher(requestEnvelope) {
     if (!action) {
       return CMPE_UTILITIES.errorEnvelope("ERR_INVALID_ACTION", "Missing target action API.", [], reqId);
     }
+
+    const isReadAction = action.endsWith(".list") ||
+      action.endsWith(".get") ||
+      action.endsWith(".preview") ||
+      action.endsWith(".validateReadiness") ||
+      action.startsWith("auth.");
+    if (!isReadAction) invalidateCatalogCache_();
     
     // Public certificate verification is intentionally read-only.
     if (action === "certificate.verify") {
@@ -544,7 +583,8 @@ function apiDispatcher(requestEnvelope) {
       // Enforce specific action permissions
       if (action === "master.tenants.list") {
         const repo = new TenantRepository();
-        const tenants = repo.findAll().map(function(t) {
+        const tenants = cachedCatalogRead_("master.tenants.list", "GLOBAL", function() {
+          return repo.findAll().map(function(t) {
           return {
             tenantId: t.tenantId,
             name: t.name,
@@ -554,7 +594,8 @@ function apiDispatcher(requestEnvelope) {
             rowVersion: t.rowVersion,
             recordStatus: t.recordStatus
           };
-        });
+          });
+        }, 120);
         return CMPE_UTILITIES.successEnvelope(tenants, reqId);
       }
       if (action === "master.tenants.create") {
@@ -600,7 +641,12 @@ function apiDispatcher(requestEnvelope) {
       }
       if (action === "master.academicYears.list") {
         const repo = new AcademicYearRepository();
-        return CMPE_UTILITIES.successEnvelope(repo.findAll(), reqId);
+        return CMPE_UTILITIES.successEnvelope(
+          cachedCatalogRead_("master.academicYears.list", tenantId, function() {
+            return repo.findAll();
+          }, 120),
+          reqId
+        );
       }
       if (action === "master.academicYears.create") {
         if (actor.permissions.indexOf("system.settings.update") === -1) {
@@ -646,7 +692,13 @@ function apiDispatcher(requestEnvelope) {
       }
       if (action === "master.schools.list") {
         const repo = new SchoolRepository();
-        const list = repo.search(payload.query, tenantId);
+        const allSchools = cachedCatalogRead_("master.schools.list", tenantId, function() {
+          return repo.findByTenant(tenantId);
+        }, 120);
+        const query = String(payload.query || "").trim().toLowerCase();
+        const list = query ? allSchools.filter(function(s) {
+          return [s.nameTh, s.nameEn, s.schoolId].join(" ").toLowerCase().indexOf(query) !== -1;
+        }) : allSchools;
         return CMPE_UTILITIES.successEnvelope(list, reqId);
       }
       if (action === "master.schools.create") {
@@ -690,7 +742,12 @@ function apiDispatcher(requestEnvelope) {
       }
       if (action === "master.educationLevels.list") {
         const repo = new EducationLevelRepository();
-        return CMPE_UTILITIES.successEnvelope(repo.findAll(), reqId);
+        return CMPE_UTILITIES.successEnvelope(
+          cachedCatalogRead_("master.educationLevels.list", tenantId, function() {
+            return repo.findAll();
+          }, 120),
+          reqId
+        );
       }
       if (action === "master.educationLevels.create") {
         if (actor.permissions.indexOf("system.settings.update") === -1) {
@@ -720,7 +777,9 @@ function apiDispatcher(requestEnvelope) {
       }
       if (action === "master.competitionTypes.list") {
         const repo = new CompetitionTypeRepository();
-        const types = repo.findAll();
+        const types = cachedCatalogRead_("master.competitionTypes.list", tenantId, function() {
+          return repo.findAll();
+        }, 120);
         return CMPE_UTILITIES.successEnvelope(types.length ? types : [{
           competitionTypeId: "TYPE_GENERAL",
           typeCode: "GENERAL",
@@ -733,7 +792,12 @@ function apiDispatcher(requestEnvelope) {
       }
       if (action === "master.categories.list") {
         const repo = new CompetitionCategoryRepository();
-        return CMPE_UTILITIES.successEnvelope(repo.findByTenant(tenantId), reqId);
+        return CMPE_UTILITIES.successEnvelope(
+          cachedCatalogRead_("master.categories.list", tenantId, function() {
+            return repo.findByTenant(tenantId);
+          }, 120),
+          reqId
+        );
       }
       if (action === "master.categories.create") {
         if (actor.permissions.indexOf("competitionCategory.manage") === -1) {
@@ -764,7 +828,12 @@ function apiDispatcher(requestEnvelope) {
       }
       if (action === "master.venues.list") {
         const repo = new VenueRepository();
-        return CMPE_UTILITIES.successEnvelope(repo.findByTenant(tenantId), reqId);
+        return CMPE_UTILITIES.successEnvelope(
+          cachedCatalogRead_("master.venues.list", tenantId, function() {
+            return repo.findByTenant(tenantId);
+          }, 120),
+          reqId
+        );
       }
       if (action === "master.venues.create") {
         if (actor.permissions.indexOf("venue.manage") === -1) {
@@ -815,12 +884,13 @@ function apiDispatcher(requestEnvelope) {
       
       // 1. competition.* endpoints
       if (action === "competition.list") {
-        const allCompetitions = compRepo.findByTenant(tenantId);
-        const canonicalCompetitions = allCompetitions.filter(function(item) {
-          return /^AY[-_]/.test(String(item.academicYearId || "")) &&
-            Boolean(item.competitionCode) &&
-            Boolean(item.nameTh);
-        });
+        const canonicalCompetitions = cachedCatalogRead_("competition.list", tenantId, function() {
+          return compRepo.findByTenant(tenantId).filter(function(item) {
+            return /^AY[-_]/.test(String(item.academicYearId || "")) &&
+              Boolean(item.competitionCode) &&
+              Boolean(item.nameTh);
+          });
+        }, 120);
         return CMPE_UTILITIES.successEnvelope(canonicalCompetitions, reqId);
       }
       if (action === "competition.workspace.get") {

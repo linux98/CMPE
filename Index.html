@@ -355,10 +355,32 @@
     };
 
     const CMPE_API = {
+      dataCache: new Map(),
+
+      isCacheable(action) {
+        return action.endsWith('.list') ||
+          action === 'competition.workspace.get' ||
+          action === 'analytics.dashboard.get';
+      },
+
+      cacheKey(action, payload) {
+        return `${CMPE_STATE.tenantId}:${action}:${JSON.stringify(payload || {})}`;
+      },
+
+      invalidateReadCache() {
+        this.dataCache.clear();
+      },
+
       async call(action, payload = {}) {
+        const cacheable = this.isCacheable(action);
+        const key = cacheable ? this.cacheKey(action, payload) : '';
+        const cached = cacheable ? this.dataCache.get(key) : null;
+        if (cached && Date.now() - cached.storedAt < 60000) {
+          return cached.data;
+        }
         const loadingToken = CMPE_LOADING.start(action);
         try {
-          return await new Promise((resolve, reject) => {
+          const data = await new Promise((resolve, reject) => {
             let settled = false;
             const timeoutId = window.setTimeout(() => {
               if (settled) return;
@@ -407,6 +429,14 @@
                 }
               });
           });
+          if (cacheable) {
+            this.dataCache.set(key, { data: data, storedAt: Date.now() });
+          } else if (!action.startsWith('auth.') &&
+                     !action.includes('.preview') &&
+                     !action.includes('.validate')) {
+            this.invalidateReadCache();
+          }
+          return data;
         } finally {
           CMPE_LOADING.finish(loadingToken);
         }
