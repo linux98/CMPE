@@ -307,6 +307,13 @@ function writePasswordHistoryEntry(userId, password) {
   }, { userId: userId, tenantId: "" });
 }
 
+function assertNoActiveReferences_(sheetName, fieldName, value, tenantId, label) {
+  const records = new BaseRepository(sheetName).findAll(tenantId);
+  if (records.some(function(item) { return item[fieldName] === value; })) {
+    throw new Error("ERR_REFERENCE_IN_USE: " + label + " is referenced by active records.");
+  }
+}
+
 /**
  * Universal API Dispatcher (Section 13: API Contract)
  * Handles all incoming browser client API execution requests.
@@ -595,6 +602,30 @@ function apiDispatcher(requestEnvelope) {
         const repo = new AcademicYearRepository();
         return CMPE_UTILITIES.successEnvelope(repo.findAll(), reqId);
       }
+      if (action === "master.academicYears.create") {
+        if (actor.permissions.indexOf("system.settings.update") === -1) {
+          return CMPE_UTILITIES.errorEnvelope("ERR_UNAUTHORIZED", "Missing system.settings.update permission", [], reqId);
+        }
+        const created = new AcademicYearService(new AcademicYearRepository()).createYear(payload, actor);
+        return CMPE_UTILITIES.successEnvelope(created, reqId);
+      }
+      if (action === "master.academicYears.update") {
+        if (actor.permissions.indexOf("system.settings.update") === -1) {
+          return CMPE_UTILITIES.errorEnvelope("ERR_UNAUTHORIZED", "Missing system.settings.update permission", [], reqId);
+        }
+        const updated = new AcademicYearService(new AcademicYearRepository()).updateYear(payload, payload.rowVersion, actor);
+        return CMPE_UTILITIES.successEnvelope(updated, reqId);
+      }
+      if (action === "master.academicYears.archive") {
+        if (actor.permissions.indexOf("system.settings.update") === -1) {
+          return CMPE_UTILITIES.errorEnvelope("ERR_UNAUTHORIZED", "Missing system.settings.update permission", [], reqId);
+        }
+        assertNoActiveReferences_("competitions", "academicYearId", payload.academicYearId, tenantId, "Academic year");
+        return CMPE_UTILITIES.successEnvelope(
+          new AcademicYearRepository().archive(payload.academicYearId, payload.rowVersion, actor),
+          reqId
+        );
+      }
       if (action === "master.academicYears.setCurrent") {
         if (actor.permissions.indexOf("academicYear.setCurrent") === -1) {
           return CMPE_UTILITIES.errorEnvelope("ERR_UNAUTHORIZED", "Missing academicYear.setCurrent permission", [], reqId);
@@ -626,6 +657,24 @@ function apiDispatcher(requestEnvelope) {
         const school = svc.createSchool(payload, actor);
         return CMPE_UTILITIES.successEnvelope(school, reqId);
       }
+      if (action === "master.schools.update") {
+        if (actor.permissions.indexOf("school.create") === -1) {
+          return CMPE_UTILITIES.errorEnvelope("ERR_UNAUTHORIZED", "Missing school management permission", [], reqId);
+        }
+        const updated = new SchoolService(new SchoolRepository(), new DistrictRepository())
+          .updateSchool(payload, payload.rowVersion, actor);
+        return CMPE_UTILITIES.successEnvelope(updated, reqId);
+      }
+      if (action === "master.schools.archive") {
+        if (actor.permissions.indexOf("school.create") === -1) {
+          return CMPE_UTILITIES.errorEnvelope("ERR_UNAUTHORIZED", "Missing school management permission", [], reqId);
+        }
+        assertNoActiveReferences_("registrations", "schoolId", payload.schoolId, tenantId, "School");
+        return CMPE_UTILITIES.successEnvelope(
+          new SchoolRepository().archive(payload.schoolId, payload.rowVersion, actor),
+          reqId
+        );
+      }
       if (action === "master.schools.import") {
         if (actor.permissions.indexOf("school.import") === -1) {
           return CMPE_UTILITIES.errorEnvelope("ERR_UNAUTHORIZED", "Missing school.import permission", [], reqId);
@@ -643,9 +692,44 @@ function apiDispatcher(requestEnvelope) {
         const repo = new EducationLevelRepository();
         return CMPE_UTILITIES.successEnvelope(repo.findAll(), reqId);
       }
+      if (action === "master.educationLevels.create") {
+        if (actor.permissions.indexOf("system.settings.update") === -1) {
+          return CMPE_UTILITIES.errorEnvelope("ERR_UNAUTHORIZED", "Missing system.settings.update permission", [], reqId);
+        }
+        const created = new EducationLevelService(new EducationLevelRepository()).createLevel(payload, actor);
+        return CMPE_UTILITIES.successEnvelope(created, reqId);
+      }
+      if (action === "master.educationLevels.update") {
+        if (actor.permissions.indexOf("system.settings.update") === -1) {
+          return CMPE_UTILITIES.errorEnvelope("ERR_UNAUTHORIZED", "Missing system.settings.update permission", [], reqId);
+        }
+        const updated = new EducationLevelRepository().update(
+          new EducationLevelEntity(payload), payload.rowVersion, actor
+        );
+        return CMPE_UTILITIES.successEnvelope(updated, reqId);
+      }
+      if (action === "master.educationLevels.archive") {
+        if (actor.permissions.indexOf("system.settings.update") === -1) {
+          return CMPE_UTILITIES.errorEnvelope("ERR_UNAUTHORIZED", "Missing system.settings.update permission", [], reqId);
+        }
+        assertNoActiveReferences_("competition_category_configs", "educationLevelId", payload.educationLevelId, tenantId, "Education level");
+        return CMPE_UTILITIES.successEnvelope(
+          new EducationLevelRepository().archive(payload.educationLevelId, payload.rowVersion, actor),
+          reqId
+        );
+      }
       if (action === "master.competitionTypes.list") {
         const repo = new CompetitionTypeRepository();
-        return CMPE_UTILITIES.successEnvelope(repo.findAll(), reqId);
+        const types = repo.findAll();
+        return CMPE_UTILITIES.successEnvelope(types.length ? types : [{
+          competitionTypeId: "TYPE_GENERAL",
+          typeCode: "GENERAL",
+          nameTh: "การแข่งขันทักษะวิชาการทั่วไป",
+          nameEn: "General Academic Competition",
+          status: "ACTIVE",
+          rowVersion: 1,
+          virtualDefault: true
+        }], reqId);
       }
       if (action === "master.categories.list") {
         const repo = new CompetitionCategoryRepository();
@@ -659,6 +743,25 @@ function apiDispatcher(requestEnvelope) {
         const cat = svc.createCategory(payload, actor);
         return CMPE_UTILITIES.successEnvelope(cat, reqId);
       }
+      if (action === "master.categories.update") {
+        if (actor.permissions.indexOf("competitionCategory.manage") === -1) {
+          return CMPE_UTILITIES.errorEnvelope("ERR_UNAUTHORIZED", "Missing competitionCategory.manage permission", [], reqId);
+        }
+        const updated = new CompetitionCategoryRepository().update(
+          new CompetitionCategoryEntity(payload), payload.rowVersion, actor
+        );
+        return CMPE_UTILITIES.successEnvelope(updated, reqId);
+      }
+      if (action === "master.categories.archive") {
+        if (actor.permissions.indexOf("competitionCategory.manage") === -1) {
+          return CMPE_UTILITIES.errorEnvelope("ERR_UNAUTHORIZED", "Missing competitionCategory.manage permission", [], reqId);
+        }
+        assertNoActiveReferences_("competition_category_configs", "categoryId", payload.categoryId, tenantId, "Competition category");
+        return CMPE_UTILITIES.successEnvelope(
+          new CompetitionCategoryRepository().archive(payload.categoryId, payload.rowVersion, actor),
+          reqId
+        );
+      }
       if (action === "master.venues.list") {
         const repo = new VenueRepository();
         return CMPE_UTILITIES.successEnvelope(repo.findByTenant(tenantId), reqId);
@@ -670,6 +773,25 @@ function apiDispatcher(requestEnvelope) {
         const svc = new VenueService(new VenueRepository(), new SchoolRepository(), new DistrictRepository());
         const venue = svc.createVenue(payload, actor);
         return CMPE_UTILITIES.successEnvelope(venue, reqId);
+      }
+      if (action === "master.venues.update") {
+        if (actor.permissions.indexOf("venue.manage") === -1) {
+          return CMPE_UTILITIES.errorEnvelope("ERR_UNAUTHORIZED", "Missing venue.manage permission", [], reqId);
+        }
+        const updated = new VenueRepository().update(
+          new VenueEntity(payload), payload.rowVersion, actor
+        );
+        return CMPE_UTILITIES.successEnvelope(updated, reqId);
+      }
+      if (action === "master.venues.archive") {
+        if (actor.permissions.indexOf("venue.manage") === -1) {
+          return CMPE_UTILITIES.errorEnvelope("ERR_UNAUTHORIZED", "Missing venue.manage permission", [], reqId);
+        }
+        assertNoActiveReferences_("competition_rooms", "venueId", payload.venueId, tenantId, "Venue");
+        return CMPE_UTILITIES.successEnvelope(
+          new VenueRepository().archive(payload.venueId, payload.rowVersion, actor),
+          reqId
+        );
       }
     }
 
@@ -693,7 +815,13 @@ function apiDispatcher(requestEnvelope) {
       
       // 1. competition.* endpoints
       if (action === "competition.list") {
-        return CMPE_UTILITIES.successEnvelope(compRepo.findByTenant(tenantId), reqId);
+        const allCompetitions = compRepo.findByTenant(tenantId);
+        const canonicalCompetitions = allCompetitions.filter(function(item) {
+          return /^AY[-_]/.test(String(item.academicYearId || "")) &&
+            Boolean(item.competitionCode) &&
+            Boolean(item.nameTh);
+        });
+        return CMPE_UTILITIES.successEnvelope(canonicalCompetitions, reqId);
       }
       if (action === "competition.workspace.get") {
         const competition = compRepo.findById(payload.competitionId, tenantId);
@@ -731,6 +859,16 @@ function apiDispatcher(requestEnvelope) {
       if (action === "competition.create") {
         if (actor.permissions.indexOf("competition.create") === -1) {
           return CMPE_UTILITIES.errorEnvelope("ERR_UNAUTHORIZED", "Missing competition.create permission", [], reqId);
+        }
+        if (payload.competitionTypeId === "TYPE_GENERAL" &&
+            !new CompetitionTypeRepository().findById("TYPE_GENERAL", tenantId)) {
+          new CompetitionTypeRepository().create(new CompetitionTypeEntity({
+            competitionTypeId: "TYPE_GENERAL",
+            typeCode: "GENERAL",
+            nameTh: "การแข่งขันทักษะวิชาการทั่วไป",
+            nameEn: "General Academic Competition",
+            status: "ACTIVE"
+          }), actor);
         }
         const comp = appSvc.createCompetition(payload, actor);
         return CMPE_UTILITIES.successEnvelope(comp, reqId);

@@ -740,8 +740,10 @@
         return this.renderMasterDataView({
           title: 'ปีการศึกษา', description: 'กำหนดปีการศึกษาปัจจุบันที่ใช้อ้างอิงทั่วทั้งระบบ',
           action: 'master.academicYears.list', idKey: 'academicYearId',
+          createAction: 'master.academicYears.create', updateAction: 'master.academicYears.update', archiveAction: 'master.academicYears.archive',
+          fields: [{ key: 'yearValue', label: 'ปีการศึกษา', required: true, type: 'number' }, { key: 'status', label: 'สถานะ', required: true, options: [{ value: 'ACTIVE', label: 'เปิดใช้งาน' }, { value: 'CLOSED', label: 'ปิดปีการศึกษา' }] }],
           columns: [{ key: 'yearValue', label: 'ปีการศึกษา' }, { key: 'status', label: 'สถานะ' }, { key: 'isCurrent', label: 'การใช้งาน', format: v => v ? 'ปีปัจจุบัน' : 'ไม่ได้เลือก' }],
-          rowAction: item => item.isCurrent ? '<span class="text-xs text-emerald-400">กำลังใช้งาน</span>' : `<button onclick="CMPE_UI.setCurrentAcademicYear('${this.escapeHtml(item.academicYearId)}')" class="rounded-lg bg-indigo-600 px-3 py-2 text-xs text-white">ตั้งเป็นปีปัจจุบัน</button>`
+          rowAction: item => `${item.isCurrent ? '<span class="mr-2 text-xs text-emerald-400">กำลังใช้งาน</span>' : `<button onclick="CMPE_UI.setCurrentAcademicYear('${this.escapeHtml(item.academicYearId)}')" class="rounded-lg bg-indigo-600 px-3 py-2 text-xs text-white">ตั้งเป็นปีปัจจุบัน</button>`}<button onclick="CMPE_UI.openMasterRecordModal('${this.escapeHtml(item.academicYearId)}')" class="ml-2 rounded-lg bg-slate-800 px-3 py-2 text-xs">แก้ไข</button>${item.isCurrent ? '' : `<button onclick="CMPE_UI.archiveMasterRecord('${this.escapeHtml(item.academicYearId)}')" class="ml-2 rounded-lg border border-rose-900 px-3 py-2 text-xs text-rose-300">เก็บถาวร</button>`}`
         });
       },
 
@@ -749,6 +751,8 @@
         return this.renderMasterDataView({
           title: 'ข้อมูลโรงเรียน', description: 'โรงเรียนภายในขอบเขตเขตพื้นที่ของผู้ใช้งาน',
           action: 'master.schools.list', payload: { query: '' }, idKey: 'schoolId',
+          createAction: 'master.schools.create', updateAction: 'master.schools.update', archiveAction: 'master.schools.archive',
+          fields: [{ key: 'schoolId', label: 'รหัสโรงเรียน', required: true, createOnly: true }, { key: 'nameTh', label: 'ชื่อโรงเรียน', required: true }, { key: 'nameEn', label: 'ชื่อภาษาอังกฤษ' }, { key: 'districtId', label: 'รหัสเครือข่าย/อำเภอ', required: true }, { key: 'email', label: 'อีเมล', type: 'email' }, { key: 'phone', label: 'โทรศัพท์' }],
           columns: [{ key: 'nameTh', label: 'ชื่อโรงเรียน' }, { key: 'nameEn', label: 'ชื่อภาษาอังกฤษ' }, { key: 'districtId', label: 'เครือข่าย/อำเภอ' }]
         });
       },
@@ -757,6 +761,8 @@
         return this.renderMasterDataView({
           title: 'ระดับการศึกษา', description: 'ข้อมูลอ้างอิงระดับชั้นที่ใช้กับหมวดหมู่และผู้สมัคร',
           action: 'master.educationLevels.list', idKey: 'educationLevelId',
+          createAction: 'master.educationLevels.create', updateAction: 'master.educationLevels.update', archiveAction: 'master.educationLevels.archive',
+          fields: [{ key: 'levelCode', label: 'รหัสระดับ', required: true }, { key: 'nameTh', label: 'ชื่อภาษาไทย', required: true }, { key: 'nameEn', label: 'ชื่อภาษาอังกฤษ' }],
           columns: [{ key: 'levelCode', label: 'รหัสระดับ' }, { key: 'nameTh', label: 'ชื่อภาษาไทย' }, { key: 'nameEn', label: 'ชื่อภาษาอังกฤษ' }]
         });
       },
@@ -765,6 +771,8 @@
         return this.renderMasterDataView({
           title: 'หมวดหมู่กิจกรรม', description: 'คลังหมวดหมู่กลางสำหรับเชื่อมกับการแข่งขันรายปี',
           action: 'master.categories.list', idKey: 'categoryId',
+          createAction: 'master.categories.create', updateAction: 'master.categories.update', archiveAction: 'master.categories.archive',
+          fields: [{ key: 'categoryCode', label: 'รหัสหมวด', required: true }, { key: 'nameTh', label: 'ชื่อกิจกรรม', required: true }, { key: 'nameEn', label: 'ชื่อภาษาอังกฤษ' }, { key: 'competitionTypeId', label: 'ประเภทการแข่งขัน', required: true, optionsAction: 'master.competitionTypes.list', optionValue: 'competitionTypeId', optionLabel: 'nameTh' }, { key: 'educationLevelId', label: 'ระดับการศึกษา', required: true, optionsAction: 'master.educationLevels.list', optionValue: 'educationLevelId', optionLabel: 'nameTh' }, { key: 'minimumParticipants', label: 'ผู้เข้าแข่งขันขั้นต่ำ', type: 'number', required: true }, { key: 'maximumParticipants', label: 'ผู้เข้าแข่งขันสูงสุด', type: 'number', required: true }, { key: 'minimumCoaches', label: 'ครูขั้นต่ำ', type: 'number', required: true }, { key: 'maximumCoaches', label: 'ครูสูงสุด', type: 'number', required: true }],
           columns: [{ key: 'categoryCode', label: 'รหัสหมวด' }, { key: 'nameTh', label: 'ชื่อกิจกรรม' }, { key: 'nameEn', label: 'ชื่อภาษาอังกฤษ' }]
         });
       },
@@ -773,6 +781,8 @@
         return this.renderMasterDataView({
           title: 'สนามแข่งขัน', description: 'สถานที่และข้อมูลอ้างอิงสำหรับจัดห้องและตารางการแข่งขัน',
           action: 'master.venues.list', idKey: 'venueId',
+          createAction: 'master.venues.create', updateAction: 'master.venues.update', archiveAction: 'master.venues.archive',
+          fields: [{ key: 'venueId', label: 'รหัสสนาม', required: true, createOnly: true }, { key: 'name', label: 'ชื่อสนาม', required: true }, { key: 'address', label: 'ที่อยู่', required: true }, { key: 'schoolId', label: 'โรงเรียนที่เชื่อมโยง' }, { key: 'type', label: 'รูปแบบ', options: [{ value: 'PHYSICAL', label: 'สถานที่จริง' }, { value: 'ONLINE', label: 'ออนไลน์' }] }, { key: 'capacity', label: 'ความจุ', type: 'number' }],
           columns: [{ key: 'name', label: 'ชื่อสนาม' }, { key: 'address', label: 'ที่อยู่' }, { key: 'districtId', label: 'พื้นที่' }]
         });
       },
@@ -780,7 +790,7 @@
       async renderMasterDataView(config) {
         this.masterViewConfig = config;
         const main = document.getElementById('main-content');
-        main.innerHTML = `<div class="w-full max-w-6xl space-y-6"><div><h2 class="text-xl font-bold text-white">${this.escapeHtml(config.title)}</h2><p class="mt-1 text-xs text-slate-400">${this.escapeHtml(config.description)}</p></div><div class="grid gap-3 rounded-2xl border border-slate-800 bg-slate-900/30 p-4 sm:grid-cols-[1fr_12rem]"><input id="master-search" oninput="CMPE_UI.filterMasterRows()" type="search" placeholder="ค้นหาในตาราง" class="rounded-xl border border-slate-800 bg-slate-950/60 px-4 py-2.5 text-xs text-white outline-none focus:border-indigo-500" /><select id="master-sort" onchange="CMPE_UI.filterMasterRows()" class="rounded-xl border border-slate-800 bg-slate-950/60 px-3 py-2.5 text-xs text-slate-300"><option value="asc">เรียง ก–ฮ</option><option value="desc">เรียง ฮ–ก</option></select></div><div class="overflow-hidden rounded-3xl border border-slate-800 bg-slate-950/40"><table class="w-full text-left text-sm"><thead class="bg-slate-900 text-xs text-slate-400"><tr>${config.columns.map(c => `<th class="px-5 py-4">${this.escapeHtml(c.label)}</th>`).join('')}<th class="px-5 py-4 text-right">ดำเนินการ</th></tr></thead><tbody id="master-table-body"><tr><td colspan="${config.columns.length + 1}" class="py-12 text-center text-slate-500">กำลังโหลด...</td></tr></tbody></table></div></div>`;
+        main.innerHTML = `<div class="w-full max-w-6xl space-y-6"><div class="flex items-center justify-between"><div><h2 class="text-xl font-bold text-white">${this.escapeHtml(config.title)}</h2><p class="mt-1 text-xs text-slate-400">${this.escapeHtml(config.description)}</p></div>${config.createAction ? `<button onclick="CMPE_UI.openMasterRecordModal()" class="rounded-xl bg-indigo-600 px-4 py-2.5 text-xs font-semibold text-white"><span class="material-icons-round mr-1 align-middle text-sm">add</span>เพิ่มข้อมูล</button>` : ''}</div><div class="grid gap-3 rounded-2xl border border-slate-800 bg-slate-900/30 p-4 sm:grid-cols-[1fr_12rem]"><input id="master-search" oninput="CMPE_UI.filterMasterRows()" type="search" placeholder="ค้นหาในตาราง" class="rounded-xl border border-slate-800 bg-slate-950/60 px-4 py-2.5 text-xs text-white outline-none focus:border-indigo-500" /><select id="master-sort" onchange="CMPE_UI.filterMasterRows()" class="rounded-xl border border-slate-800 bg-slate-950/60 px-3 py-2.5 text-xs text-slate-300"><option value="asc">เรียง ก–ฮ</option><option value="desc">เรียง ฮ–ก</option></select></div><div class="overflow-hidden rounded-3xl border border-slate-800 bg-slate-950/40"><table class="w-full text-left text-sm"><thead class="bg-slate-900 text-xs text-slate-400"><tr>${config.columns.map(c => `<th class="px-5 py-4">${this.escapeHtml(c.label)}</th>`).join('')}<th class="px-5 py-4 text-right">ดำเนินการ</th></tr></thead><tbody id="master-table-body"><tr><td colspan="${config.columns.length + 1}" class="py-12 text-center text-slate-500">กำลังโหลด...</td></tr></tbody></table></div></div>`;
         try {
           const list = await CMPE_API.call(config.action, config.payload || {});
           this.masterListCache = Array.isArray(list) ? list : [];
@@ -809,13 +819,79 @@
         const size = 15, pages = Math.max(1, Math.ceil(list.length / size));
         this.masterCurrentPage = Math.min(this.masterCurrentPage || 1, pages);
         const rows = list.slice((this.masterCurrentPage - 1) * size, this.masterCurrentPage * size);
-        tbody.innerHTML = rows.length ? rows.map(item => `<tr class="border-b border-slate-900 hover:bg-slate-900/30">${config.columns.map(c => `<td class="px-5 py-4 text-slate-300">${this.escapeHtml(c.format ? c.format(item[c.key], item) : (item[c.key] ?? '—'))}</td>`).join('')}<td class="px-5 py-4 text-right">${config.rowAction ? config.rowAction(item) : `<span class="font-mono text-[10px] text-slate-600">${this.escapeHtml(item[config.idKey] || '')}</span>`}</td></tr>`).join('') : `<tr><td colspan="${config.columns.length + 1}" class="py-12 text-center text-slate-500">ไม่พบข้อมูล</td></tr>`;
+        tbody.innerHTML = rows.length ? rows.map(item => `<tr class="border-b border-slate-900 hover:bg-slate-900/30">${config.columns.map(c => `<td class="px-5 py-4 text-slate-300">${this.escapeHtml(c.format ? c.format(item[c.key], item) : (item[c.key] ?? '—'))}</td>`).join('')}<td class="px-5 py-4 text-right">${config.rowAction ? config.rowAction(item) : `${config.updateAction ? `<button onclick="CMPE_UI.openMasterRecordModal('${this.escapeHtml(item[config.idKey])}')" class="rounded-lg bg-slate-800 px-3 py-2 text-xs text-slate-200">แก้ไข</button>` : ''}${config.archiveAction ? `<button onclick="CMPE_UI.archiveMasterRecord('${this.escapeHtml(item[config.idKey])}')" class="ml-2 rounded-lg border border-rose-900 px-3 py-2 text-xs text-rose-300">เก็บถาวร</button>` : ''}`}</td></tr>`).join('') : `<tr><td colspan="${config.columns.length + 1}" class="py-12 text-center text-slate-500">ไม่พบข้อมูล</td></tr>`;
         if (pages > 1) tbody.innerHTML += `<tr><td colspan="${config.columns.length + 1}" class="px-5 py-4"><div class="flex justify-between"><button onclick="CMPE_UI.changeMasterPage(-1)" ${this.masterCurrentPage === 1 ? 'disabled' : ''} class="rounded-lg border border-slate-700 px-3 py-2 text-xs disabled:opacity-30">ก่อนหน้า</button><span class="text-xs text-slate-500">หน้า ${this.masterCurrentPage}/${pages} · ${list.length} รายการ</span><button onclick="CMPE_UI.changeMasterPage(1)" ${this.masterCurrentPage === pages ? 'disabled' : ''} class="rounded-lg border border-slate-700 px-3 py-2 text-xs disabled:opacity-30">ถัดไป</button></div></td></tr>`;
       },
 
       changeMasterPage(delta) {
         this.masterCurrentPage = Math.max(1, (this.masterCurrentPage || 1) + delta);
         this.renderMasterRows(this.masterFilteredCache || []);
+      },
+
+      async openMasterRecordModal(recordId = '') {
+        const config = this.masterViewConfig;
+        const current = (this.masterListCache || []).find(item => String(item[config.idKey]) === String(recordId)) || {};
+        const editing = Boolean(recordId);
+        const optionData = {};
+        try {
+          const optionActions = [...new Set((config.fields || []).map(f => f.optionsAction).filter(Boolean))];
+          const results = await Promise.all(optionActions.map(action => CMPE_API.call(action)));
+          optionActions.forEach((action, index) => optionData[action] = results[index]);
+        } catch (e) {
+          this.showToast(e.message || 'โหลดข้อมูลตัวเลือกไม่สำเร็จ', 'error');
+          return;
+        }
+        const fieldsHtml = (config.fields || []).filter(field => !(editing && field.createOnly)).map(field => {
+          const value = current[field.key] ?? '';
+          const options = field.options || (field.optionsAction ? (optionData[field.optionsAction] || []).map(item => ({
+            value: item[field.optionValue], label: item[field.optionLabel] || item[field.optionValue]
+          })) : null);
+          if (options) {
+            return `<label class="space-y-1"><span class="text-xs text-slate-400">${this.escapeHtml(field.label)}</span><select data-master-field="${this.escapeHtml(field.key)}" ${field.required ? 'required' : ''} class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2.5 text-xs text-white">${options.map(option => `<option value="${this.escapeHtml(option.value)}" ${String(option.value) === String(value) ? 'selected' : ''}>${this.escapeHtml(option.label)}</option>`).join('')}</select></label>`;
+          }
+          return `<label class="space-y-1"><span class="text-xs text-slate-400">${this.escapeHtml(field.label)}</span><input data-master-field="${this.escapeHtml(field.key)}" type="${field.type || 'text'}" value="${this.escapeHtml(value)}" ${field.required ? 'required' : ''} class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2.5 text-xs text-white outline-none focus:border-indigo-500" /></label>`;
+        }).join('');
+        const modal = document.createElement('div');
+        modal.id = 'master-record-modal';
+        modal.className = 'fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-slate-950/80 p-4 backdrop-blur-sm';
+        modal.innerHTML = `<div class="my-6 w-full max-w-2xl space-y-5 rounded-3xl border border-slate-800 bg-slate-900 p-6"><div><h3 class="text-lg font-bold text-white">${editing ? 'แก้ไข' : 'เพิ่ม'}${this.escapeHtml(config.title)}</h3><p class="text-xs text-slate-500">ระบบจะตรวจรูปแบบข้อมูล ความสัมพันธ์ และการแก้ไขพร้อมกันก่อนบันทึก</p></div><form onsubmit="CMPE_UI.saveMasterRecord(event, '${this.escapeHtml(recordId)}')" class="grid gap-4 sm:grid-cols-2">${fieldsHtml}<div class="flex justify-end gap-3 pt-2 sm:col-span-2"><button type="button" onclick="document.getElementById('master-record-modal').remove()" class="rounded-xl border border-slate-700 px-4 py-2.5 text-xs">ยกเลิก</button><button class="rounded-xl bg-indigo-600 px-4 py-2.5 text-xs font-semibold text-white">บันทึกข้อมูล</button></div></form></div>`;
+        document.body.appendChild(modal);
+      },
+
+      async saveMasterRecord(event, recordId) {
+        event.preventDefault();
+        const config = this.masterViewConfig;
+        const existing = (this.masterListCache || []).find(item => String(item[config.idKey]) === String(recordId));
+        const payload = Object.assign({}, existing || {});
+        document.querySelectorAll('#master-record-modal [data-master-field]').forEach(input => {
+          const field = (config.fields || []).find(item => item.key === input.dataset.masterField);
+          payload[input.dataset.masterField] = field?.type === 'number' ? Number(input.value) : input.value.trim();
+        });
+        if (existing) payload.rowVersion = existing.rowVersion;
+        try {
+          await CMPE_API.call(existing ? config.updateAction : config.createAction, payload);
+          document.getElementById('master-record-modal')?.remove();
+          this.showToast(existing ? 'บันทึกการแก้ไขแล้ว' : 'เพิ่มข้อมูลแล้ว', 'success');
+          await this.renderMasterDataView(config);
+        } catch (e) {
+          this.showToast(e.message || 'บันทึกข้อมูลไม่สำเร็จ', 'error');
+        }
+      },
+
+      async archiveMasterRecord(recordId) {
+        const config = this.masterViewConfig;
+        const existing = (this.masterListCache || []).find(item => String(item[config.idKey]) === String(recordId));
+        if (!existing || !confirm('ยืนยันการเก็บรายการนี้เป็นข้อมูลถาวร? ระบบจะป้องกันรายการที่ยังถูกอ้างอิงอยู่')) return;
+        try {
+          await CMPE_API.call(config.archiveAction, {
+            [config.idKey]: existing[config.idKey],
+            rowVersion: existing.rowVersion
+          });
+          this.showToast('เก็บข้อมูลเป็นรายการถาวรแล้ว', 'success');
+          await this.renderMasterDataView(config);
+        } catch (e) {
+          this.showToast(e.message || 'ไม่สามารถเก็บถาวรได้ เนื่องจากข้อมูลยังถูกใช้งาน', 'error');
+        }
       },
 
       async setCurrentAcademicYear(academicYearId) {
@@ -2055,7 +2131,7 @@
           this.filterCompetitionRows();
         } catch (e) {
           const tbody = document.getElementById('competitions-table-body');
-          if (tbody) tbody.innerHTML = `<tr><td colspan="4" class="px-6 py-12 text-center text-rose-300"><span class="material-icons-round block text-3xl">cloud_off</span><p class="mt-2">โหลดการแข่งขันไม่สำเร็จ</p><button onclick="CMPE_UI.renderCompetitionsView()" class="mt-3 rounded-lg border border-rose-700 px-3 py-2 text-xs">ลองใหม่</button></td></tr>`;
+          if (tbody) tbody.innerHTML = `<tr><td colspan="4" class="px-6 py-12 text-center text-rose-300"><span class="material-icons-round block text-3xl">cloud_off</span><p class="mt-2">โหลดการแข่งขันไม่สำเร็จ</p><p class="mx-auto mt-2 max-w-xl break-words font-mono text-[10px] text-rose-400">${this.escapeHtml((e.code ? e.code + ': ' : '') + (e.message || String(e)))}</p><button onclick="CMPE_UI.renderCompetitionsView()" class="mt-3 rounded-lg border border-rose-700 px-3 py-2 text-xs">ลองใหม่</button></td></tr>`;
           this.showToast(e.message || 'ดึงข้อมูลการแข่งขันไม่สำเร็จ', 'error');
         }
       },
