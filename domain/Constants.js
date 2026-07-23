@@ -7,13 +7,21 @@ const CMPE_CONSTANTS = {
   // Roles
   Roles: {
     SUPER_ADMIN: "SUPER_ADMIN",
+    TENANT_ADMIN: "TENANT_ADMIN",
     AREA_ADMIN: "AREA_ADMIN",
+    COMPETITION_MANAGER: "COMPETITION_MANAGER",
+    REGISTRATION_OFFICER: "REGISTRATION_OFFICER",
     SCHOOL_ADMIN: "SCHOOL_ADMIN",
     SCHOOL_REGISTRAR: "SCHOOL_REGISTRAR",
+    TEACHER: "TEACHER",
+    JUDGE: "JUDGE",
     CHIEF_JUDGE: "CHIEF_JUDGE",
     SCORE_JUDGE: "SCORE_JUDGE",
+    VENUE_MANAGER: "VENUE_MANAGER",
+    CERTIFICATE_OFFICER: "CERTIFICATE_OFFICER",
     AUDITOR: "AUDITOR",
-    GUEST_VIEWER: "GUEST_VIEWER"
+    GUEST_VIEWER: "GUEST_VIEWER",
+    VIEWER: "VIEWER"
   },
 
   // Permissions
@@ -29,6 +37,42 @@ const CMPE_CONSTANTS = {
     AUDIT_READ: "audit.read",
     SETTINGS_UPDATE: "system.settings.update"
   },
+
+  // Canonical permission catalog used by both the API and the SPA. Tenant and
+  // super administrators receive this catalog as an explicit wildcard while
+  // granular roles continue to use role_permissions from the database.
+  AllPermissions: [
+    "tenant.read", "tenant.create",
+    "academicYear.read", "academicYear.setCurrent",
+    "province.read", "district.read",
+    "school.read", "school.create", "school.import",
+    "educationLevel.read", "competitionType.read",
+    "competitionCategory.read", "competitionCategory.manage",
+    "venue.read", "venue.manage",
+    "competition.read", "competition.create", "competition.update",
+    "competition.clone", "competition.transition",
+    "competitionRound.manage", "competitionCategoryConfig.manage",
+    "categoryRule.manage", "scoreTemplate.manage",
+    "quotaRule.manage", "registrationWindow.manage", "medalRule.manage",
+    "registration.readOwnSchool", "registration.readTenant",
+    "registration.create", "registration.submit", "registration.review",
+    "registration.approve", "registration.reject",
+    "registrationMember.manage", "registrationCoach.manage",
+    "judge.read", "judge.create", "judgeAssignment.create",
+    "competitionRoom.manage", "roomSchedule.create",
+    "operationalReadiness.validate", "checkin.record", "checkin.reverse",
+    "announcement.create",
+    "score.enter", "score.updateOwnDraft", "score.submit",
+    "score.verify", "score.returnForCorrection", "score.lock", "score.unlock",
+    "appeal.submit",
+    "certificate.generate", "certificate.download",
+    "certificate.revoke", "certificate.regenerate",
+    "notification.readTenant", "notification.createManual",
+    "dashboard.readTenant", "dashboard.readOwnSchool",
+    "leaderboard.readInternal",
+    "report.request", "report.readTenant", "report.readOwn",
+    "audit.read", "system.settings.update"
+  ],
 
   // Metadata Columns required for mutable tenant tables
   MetadataColumns: [

@@ -256,9 +256,16 @@ class RbacRepository {
       }
     }
     
+    const isAdministrator = userRoles.indexOf("SUPER_ADMIN") !== -1 ||
+      userRoles.indexOf("TENANT_ADMIN") !== -1 ||
+      userRoles.indexOf("AREA_ADMIN") !== -1;
+    const effectivePermissions = isAdministrator
+      ? CMPE_CONSTANTS.AllPermissions.slice()
+      : Array.from(new Set(permissions));
+
     return {
-      roles: userRoles,
-      permissions: permissions
+      roles: Array.from(new Set(userRoles)),
+      permissions: effectivePermissions
     };
   }
 }

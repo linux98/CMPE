@@ -241,6 +241,7 @@ function apiDispatcher(requestEnvelope) {
     if (action.startsWith("system.")) {
       const actor = getSessionManager().verifySession(sessionToken, tenantId);
       const isAdmin = actor.roles.indexOf("SUPER_ADMIN") !== -1 ||
+        actor.roles.indexOf("TENANT_ADMIN") !== -1 ||
         actor.roles.indexOf("AREA_ADMIN") !== -1;
       if (!isAdmin || !isMaintenanceRequestAuthorized_(payload.maintenanceToken)) {
         return CMPE_UTILITIES.errorEnvelope(
@@ -1037,7 +1038,9 @@ function apiDispatcher(requestEnvelope) {
 
       if (action === "notification.internal.processQueues") {
         // Enforce admin/system check
-        if (actor.roles.indexOf("SUPER_ADMIN") === -1 && actor.roles.indexOf("AREA_ADMIN") === -1) {
+        if (actor.roles.indexOf("SUPER_ADMIN") === -1 &&
+            actor.roles.indexOf("TENANT_ADMIN") === -1 &&
+            actor.roles.indexOf("AREA_ADMIN") === -1) {
           return CMPE_UTILITIES.errorEnvelope("ERR_UNAUTHORIZED", "Only system/administrators can execute worker tasks.", [], reqId);
         }
         const tgSuccess = tgSvc.processTelegramQueue(payload.batchSize || 10, actor);
@@ -1105,7 +1108,9 @@ function apiDispatcher(requestEnvelope) {
       }
 
       if (action === "report.internal.processJobs") {
-        if (actor.roles.indexOf("SUPER_ADMIN") === -1 && actor.roles.indexOf("AREA_ADMIN") === -1) {
+        if (actor.roles.indexOf("SUPER_ADMIN") === -1 &&
+            actor.roles.indexOf("TENANT_ADMIN") === -1 &&
+            actor.roles.indexOf("AREA_ADMIN") === -1) {
           return CMPE_UTILITIES.errorEnvelope("ERR_UNAUTHORIZED", "Only system/administrators can execute report jobs.", [], reqId);
         }
         const processed = reportSvc.processReportJob(payload.reportId, actor);
