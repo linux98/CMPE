@@ -213,6 +213,45 @@ function getRegistrationDisplayLookup_() {
   };
 }
 
+function getBrandSettings_(tenantId) {
+  const defaults = {
+    systemName: "ระบบจัดการแข่งขัน ก.พ.ด.",
+    tagline: "การบริหารการแข่งขันอย่างเป็นระบบ",
+    logoIcon: "notifications_active",
+    logoUrl: "",
+    footerPrimary: "ระบบบริหารจัดการและประมวลผลการแข่งขันสำหรับโรงเรียน",
+    footerSecondary: "ลิขสิทธิ์ © 2026 สงวนลิขสิทธิ์"
+  };
+  try {
+    const raw = PropertiesService.getScriptProperties()
+      .getProperty("BRAND_SETTINGS_" + String(tenantId || "DEFAULT"));
+    return Object.assign(defaults, raw ? JSON.parse(raw) : {});
+  } catch (error) {
+    return defaults;
+  }
+}
+
+function saveBrandSettings_(tenantId, payload) {
+  const allowedIcons = ["notifications_active", "emoji_events", "school", "workspace_premium", "stars", "military_tech"];
+  const clean = {
+    systemName: String(payload.systemName || "").trim().slice(0, 80),
+    tagline: String(payload.tagline || "").trim().slice(0, 140),
+    logoIcon: allowedIcons.indexOf(payload.logoIcon) !== -1 ? payload.logoIcon : "notifications_active",
+    logoUrl: String(payload.logoUrl || "").trim().slice(0, 500),
+    footerPrimary: String(payload.footerPrimary || "").trim().slice(0, 180),
+    footerSecondary: String(payload.footerSecondary || "").trim().slice(0, 180)
+  };
+  if (!clean.systemName) throw new Error("ERR_SYSTEM_NAME_REQUIRED");
+  if (clean.logoUrl && !/^https:\/\/[^\s]+$/i.test(clean.logoUrl)) {
+    throw new Error("ERR_LOGO_URL_INVALID");
+  }
+  PropertiesService.getScriptProperties().setProperty(
+    "BRAND_SETTINGS_" + String(tenantId || "DEFAULT"),
+    JSON.stringify(clean)
+  );
+  return clean;
+}
+
 function jsonOutput_(value) {
   return ContentService.createTextOutput(JSON.stringify(value))
     .setMimeType(ContentService.MimeType.JSON);
@@ -367,6 +406,18 @@ function apiDispatcher(requestEnvelope) {
     
     if (!action) {
       return CMPE_UTILITIES.errorEnvelope("ERR_INVALID_ACTION", "Missing target action API.", [], reqId);
+    }
+
+    if (action === "branding.get") {
+      return CMPE_UTILITIES.successEnvelope(getBrandSettings_(tenantId), reqId);
+    }
+
+    if (action === "branding.update") {
+      const brandActor = getSessionManager().verifySession(sessionToken, tenantId);
+      if (brandActor.permissions.indexOf("system.settings.update") === -1) {
+        return CMPE_UTILITIES.errorEnvelope("ERR_UNAUTHORIZED", "Missing system.settings.update permission", [], reqId);
+      }
+      return CMPE_UTILITIES.successEnvelope(saveBrandSettings_(tenantId, payload), reqId);
     }
 
     const isReadAction = action.endsWith(".list") ||

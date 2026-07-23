@@ -65,6 +65,18 @@
       #app-sidebar:not(.hidden) + #main-content {
         padding: 1.25rem;
       }
+      #app-sidebar {
+        position: fixed;
+        inset: 65px auto 0 0;
+        z-index: 45;
+        width: min(19rem, 88vw);
+        transform: translateX(-105%);
+        transition: transform .25s ease;
+        box-shadow: 20px 0 50px rgba(2, 6, 23, .65);
+      }
+      #app-sidebar.mobile-open { transform: translateX(0); }
+      #sidebar-backdrop.mobile-open { display: block; }
+      #main-content { width: 100%; min-width: 0; padding: 1.25rem; }
     }
 
     .premium-loader-ring,
@@ -117,14 +129,17 @@
   <div id="app" class="flex-grow flex flex-col">
     <!-- Header -->
     <header class="w-full border-b border-slate-800 bg-slate-950/80 backdrop-blur-md sticky top-0 z-40">
-      <div class="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-        <div class="flex items-center space-x-3">
-          <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-500 via-purple-500 to-pink-500 flex items-center justify-center">
-            <span class="material-icons-round text-white">notifications_active</span>
+      <div class="w-full px-4 sm:px-6 py-3 flex items-center justify-between gap-3">
+        <div class="flex min-w-0 items-center gap-3">
+          <button id="mobile-menu-button" onclick="CMPE_UI.toggleMobileSidebar()" class="hidden rounded-xl border border-slate-800 p-2 text-slate-300 max-[900px]:inline-flex" aria-label="เปิดเมนู">
+            <span class="material-icons-round">menu</span>
+          </button>
+          <div id="brand-logo" class="w-10 h-10 shrink-0 rounded-xl bg-gradient-to-tr from-indigo-500 via-purple-500 to-pink-500 flex items-center justify-center">
+            <span id="brand-logo-icon" class="material-icons-round text-white">notifications_active</span>
           </div>
-          <div>
-            <h1 class="text-lg font-bold tracking-tight text-white">ระบบจัดการแข่งขัน ก.พ.ด.</h1>
-            <p class="text-xs text-indigo-400 font-medium tracking-wider uppercase">การคุมการนำส่งข้อความแจ้งเตือนและระบบคิวงาน</p>
+          <div class="min-w-0">
+            <h1 id="brand-system-name" class="truncate text-base sm:text-lg font-bold tracking-tight text-white">ระบบจัดการแข่งขัน ก.พ.ด.</h1>
+            <p id="brand-tagline" class="hidden truncate text-xs text-indigo-400 font-medium sm:block">การบริหารการแข่งขันอย่างเป็นระบบ</p>
           </div>
         </div>
         <div id="user-header-status" class="flex items-center space-x-4">
@@ -134,10 +149,10 @@
     </header>
 
     <!-- Content Workspace -->
-    <div class="flex-grow flex">
+    <div class="flex-grow flex min-h-0">
+      <button id="sidebar-backdrop" onclick="CMPE_UI.closeMobileSidebar()" class="fixed inset-0 top-[65px] z-40 hidden bg-slate-950/70 backdrop-blur-sm" aria-label="ปิดเมนู"></button>
       <!-- Sidebar Navigation (Hidden for non-logged-in) -->
-      <aside id="app-sidebar" class="w-64 border-r border-slate-900 bg-slate-950/40 p-4 space-y-2 hidden">
-        <p class="text-[10px] text-slate-500 font-bold uppercase tracking-widest px-3 mb-2">Workspace</p>
+      <aside id="app-sidebar" class="w-64 shrink-0 overflow-y-auto border-r border-slate-900 bg-slate-950/95 p-4 space-y-2 hidden">
         <nav class="space-y-1" id="sidebar-nav">
           <!-- Populated dynamically based on permissions -->
         </nav>
@@ -154,9 +169,9 @@
     </div>
 
     <!-- Footer -->
-    <footer class="w-full border-t border-slate-900 bg-slate-950/60 py-4 text-center text-[10px] text-slate-600">
-      <p>ระบบบริหารจัดการและประมวลผลการแข่งขันสำหรับโรงเรียนโครงการพระราชดำริฯ ก.พ.ด. ภาคอีสาน</p>
-      <p>ลิขสิทธิ์ © 2026 สพม.สกลนคร. ทั้งหมดได้รับการสงวนลิขสิทธิ์</p>
+    <footer class="w-full border-t border-slate-900 bg-slate-950/60 px-4 py-4 text-center text-[10px] text-slate-600">
+      <p id="brand-footer-primary">ระบบบริหารจัดการและประมวลผลการแข่งขันสำหรับโรงเรียน</p>
+      <p id="brand-footer-secondary">ลิขสิทธิ์ © 2026 สงวนลิขสิทธิ์</p>
     </footer>
   </div>
 
@@ -447,6 +462,7 @@
     const CMPE_UI = {
       async init() {
         window.addEventListener('hashchange', () => this.route());
+        await this.loadBranding();
         if (CMPE_STATE.sessionToken) {
           try {
             const session = await CMPE_API.call('auth.me');
@@ -466,6 +482,37 @@
           }
         }
         this.route();
+      },
+
+      async loadBranding(forceRefresh) {
+        if (forceRefresh) CMPE_API.invalidateReadCache();
+        try {
+          const brand = await CMPE_API.call('branding.get', {});
+          this.brandSettings = brand;
+          this.applyBranding(brand);
+          return brand;
+        } catch (error) {
+          return this.brandSettings || {};
+        }
+      },
+
+      applyBranding(brand) {
+        if (!brand) return;
+        const setText = (id, value) => {
+          const element = document.getElementById(id);
+          if (element && value) element.textContent = value;
+        };
+        setText('brand-system-name', brand.systemName);
+        setText('brand-tagline', brand.tagline);
+        setText('brand-footer-primary', brand.footerPrimary);
+        setText('brand-footer-secondary', brand.footerSecondary);
+        const logo = document.getElementById('brand-logo');
+        if (logo) {
+          logo.innerHTML = brand.logoUrl
+            ? `<img src="${this.escapeHtml(brand.logoUrl)}" alt="โลโก้ระบบ" class="h-full w-full rounded-xl object-cover" onerror="this.parentNode.innerHTML='<span class=&quot;material-icons-round text-white&quot;>${this.escapeHtml(brand.logoIcon || 'notifications_active')}</span>'">`
+            : `<span class="material-icons-round text-white">${this.escapeHtml(brand.logoIcon || 'notifications_active')}</span>`;
+        }
+        document.title = brand.systemName || 'CMPE';
       },
 
       route() {
@@ -519,6 +566,8 @@
           this.renderNotificationInboxView();
         } else if (hash === '#notification-admin-queues') {
           this.renderNotificationAdminQueuesView();
+        } else if (hash === '#brand-settings') {
+          this.renderBrandSettingsView();
         } else {
           this.renderLoginView();
         }
@@ -526,6 +575,17 @@
 
       navigateTo(route) {
         window.location.hash = route;
+        this.closeMobileSidebar();
+      },
+
+      toggleMobileSidebar() {
+        document.getElementById('app-sidebar')?.classList.toggle('mobile-open');
+        document.getElementById('sidebar-backdrop')?.classList.toggle('mobile-open');
+      },
+
+      closeMobileSidebar() {
+        document.getElementById('app-sidebar')?.classList.remove('mobile-open');
+        document.getElementById('sidebar-backdrop')?.classList.remove('mobile-open');
       },
 
       showToast(message, type = 'info') {
@@ -644,12 +704,14 @@
         const nav = document.getElementById('sidebar-nav');
         
         let navHtml = `
+          <p class="px-3 pb-1 pt-1 text-[10px] font-bold uppercase tracking-[.18em] text-slate-600">ภาพรวม</p>
           <a href="#dashboard" class="flex items-center space-x-3 px-3 py-2.5 rounded-xl text-sm font-medium text-slate-300 hover:bg-slate-900 hover:text-white transition">
             <span class="material-icons-round text-slate-500">grid_view</span>
             <span>แดชบอร์ดหลัก</span>
           </a>
         `;
 
+        navHtml += `<p class="px-3 pb-1 pt-4 text-[10px] font-bold uppercase tracking-[.18em] text-slate-600">การสมัครและการแข่งขัน</p>`;
         if (permissions.includes('registration.readOwnSchool') || permissions.includes('registration.create')) {
           navHtml += `
             <a href="#registrations-school" class="flex items-center space-x-3 px-3 py-2.5 rounded-xl text-sm font-medium text-slate-300 hover:bg-slate-900 hover:text-white transition">
@@ -668,6 +730,7 @@
           `;
         }
 
+        navHtml += `<p class="px-3 pb-1 pt-4 text-[10px] font-bold uppercase tracking-[.18em] text-slate-600">ปฏิบัติการหน้างาน</p>`;
         if (permissions.includes('judge.read')) {
           navHtml += `
             <a href="#operations-judges" class="flex items-center space-x-3 px-3 py-2.5 rounded-xl text-sm font-medium text-slate-300 hover:bg-slate-900 hover:text-white transition">
@@ -713,6 +776,7 @@
           `;
         }
 
+        navHtml += `<p class="px-3 pb-1 pt-4 text-[10px] font-bold uppercase tracking-[.18em] text-slate-600">การสื่อสาร</p>`;
         // Notification Inbox link (In-app inbox)
         navHtml += `
           <a href="#notification-inbox" class="flex items-center space-x-3 px-3 py-2.5 rounded-xl text-sm font-medium text-slate-300 hover:bg-slate-900 hover:text-white transition">
@@ -730,6 +794,7 @@
           `;
         }
 
+        navHtml += `<p class="px-3 pb-1 pt-4 text-[10px] font-bold uppercase tracking-[.18em] text-slate-600">ข้อมูลและการตั้งค่า</p>`;
         if (permissions.includes('competition.read')) {
           navHtml += `
             <a href="#competitions" class="flex items-center space-x-3 px-3 py-2.5 rounded-xl text-sm font-medium text-slate-300 hover:bg-slate-900 hover:text-white transition">
@@ -764,7 +829,119 @@
           `;
         }
 
+        if (permissions.includes('system.settings.update')) {
+          navHtml += `
+            <a href="#brand-settings" class="flex items-center space-x-3 px-3 py-2.5 rounded-xl text-sm font-medium text-slate-300 hover:bg-slate-900 hover:text-white transition">
+              <span class="material-icons-round text-slate-500">palette</span>
+              <span>แบรนด์และหน้าตาระบบ</span>
+            </a>`;
+        }
+
         nav.innerHTML = navHtml;
+      },
+
+      async renderBrandSettingsView() {
+        const main = document.getElementById('main-content');
+        main.innerHTML = `
+          <div class="w-full max-w-6xl space-y-5">
+            <div>
+              <p class="mb-1 text-[10px] font-bold uppercase tracking-[.2em] text-indigo-400">System identity</p>
+              <h2 class="text-2xl font-bold text-white">แบรนด์และหน้าตาระบบ</h2>
+              <p class="mt-1 text-xs text-slate-400">ปรับชื่อ โลโก้ ข้อความแนะนำ และ Footer โดยเห็นตัวอย่างก่อนเผยแพร่</p>
+            </div>
+            <div class="grid gap-5 xl:grid-cols-[1fr_22rem]">
+              <form id="brand-settings-form" onsubmit="CMPE_UI.saveBrandSettings(event)" class="space-y-5 rounded-3xl border border-slate-800 bg-slate-900/35 p-5 sm:p-6">
+                <div class="grid gap-4 md:grid-cols-2">
+                  <label class="space-y-2 md:col-span-2"><span class="text-xs font-semibold text-slate-300">ชื่อระบบ</span><input id="brand-input-name" required maxlength="80" oninput="CMPE_UI.previewBrandSettings()" class="w-full rounded-xl border border-slate-700 bg-slate-950/70 px-4 py-3 text-sm text-white outline-none focus:border-indigo-500"></label>
+                  <label class="space-y-2 md:col-span-2"><span class="text-xs font-semibold text-slate-300">ข้อความอธิบายสั้น</span><input id="brand-input-tagline" maxlength="140" oninput="CMPE_UI.previewBrandSettings()" class="w-full rounded-xl border border-slate-700 bg-slate-950/70 px-4 py-3 text-sm text-white outline-none focus:border-indigo-500"></label>
+                </div>
+                <div class="space-y-3">
+                  <div><p class="text-xs font-semibold text-slate-300">เลือกสัญลักษณ์โลโก้</p><p class="mt-1 text-[11px] text-slate-500">คลิกสัญลักษณ์ที่ต้องการ หรือระบุ URL รูปภาพด้านล่าง</p></div>
+                  <input id="brand-input-icon" type="hidden">
+                  <div class="grid grid-cols-3 gap-2 sm:grid-cols-6">
+                    ${['notifications_active','emoji_events','school','workspace_premium','stars','military_tech'].map(icon => `<button type="button" data-brand-icon="${icon}" onclick="CMPE_UI.selectBrandIcon('${icon}')" class="brand-icon-choice rounded-2xl border border-slate-800 bg-slate-950/60 p-3 text-slate-400 transition hover:border-indigo-500 hover:text-white"><span class="material-icons-round text-2xl">${icon}</span></button>`).join('')}
+                  </div>
+                  <label class="block space-y-2"><span class="text-xs font-semibold text-slate-300">URL รูปโลโก้ (ไม่บังคับ)</span><input id="brand-input-url" type="url" maxlength="500" placeholder="https://..." oninput="CMPE_UI.previewBrandSettings()" class="w-full rounded-xl border border-slate-700 bg-slate-950/70 px-4 py-3 text-sm text-white outline-none focus:border-indigo-500"><span class="block text-[10px] text-slate-500">ใช้รูป HTTPS ทรงสี่เหลี่ยม ขนาดแนะนำ 256 × 256 พิกเซล</span></label>
+                </div>
+                <div class="grid gap-4">
+                  <label class="space-y-2"><span class="text-xs font-semibold text-slate-300">Footer บรรทัดหลัก</span><input id="brand-input-footer-primary" maxlength="180" oninput="CMPE_UI.previewBrandSettings()" class="w-full rounded-xl border border-slate-700 bg-slate-950/70 px-4 py-3 text-sm text-white outline-none focus:border-indigo-500"></label>
+                  <label class="space-y-2"><span class="text-xs font-semibold text-slate-300">Footer บรรทัดรอง / ลิขสิทธิ์</span><input id="brand-input-footer-secondary" maxlength="180" oninput="CMPE_UI.previewBrandSettings()" class="w-full rounded-xl border border-slate-700 bg-slate-950/70 px-4 py-3 text-sm text-white outline-none focus:border-indigo-500"></label>
+                </div>
+                <div class="flex flex-col-reverse gap-3 border-t border-slate-800 pt-5 sm:flex-row sm:justify-end">
+                  <button type="button" onclick="CMPE_UI.populateBrandForm(CMPE_UI.brandSettings)" class="rounded-xl border border-slate-700 px-5 py-3 text-xs font-semibold text-slate-300">ยกเลิกการแก้ไข</button>
+                  <button type="submit" class="rounded-xl bg-indigo-600 px-6 py-3 text-xs font-semibold text-white hover:bg-indigo-500">บันทึกและเผยแพร่</button>
+                </div>
+              </form>
+              <aside class="h-fit rounded-3xl border border-indigo-500/20 bg-gradient-to-b from-indigo-500/10 to-slate-950/30 p-5 xl:sticky xl:top-24">
+                <p class="text-[10px] font-bold uppercase tracking-[.18em] text-indigo-400">Live preview</p>
+                <div class="mt-4 overflow-hidden rounded-2xl border border-slate-700 bg-slate-950 shadow-2xl">
+                  <div class="flex items-center gap-3 border-b border-slate-800 p-4">
+                    <div id="brand-preview-logo" class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-tr from-indigo-500 via-purple-500 to-pink-500"></div>
+                    <div class="min-w-0"><p id="brand-preview-name" class="truncate text-sm font-bold text-white"></p><p id="brand-preview-tagline" class="truncate text-[10px] text-indigo-400"></p></div>
+                  </div>
+                  <div class="h-28 bg-gradient-to-br from-slate-950 to-indigo-950/30"></div>
+                  <div class="border-t border-slate-800 p-3 text-center text-[8px] text-slate-500"><p id="brand-preview-footer-primary"></p><p id="brand-preview-footer-secondary"></p></div>
+                </div>
+                <p class="mt-4 text-[11px] leading-5 text-slate-500">การตั้งค่าจะใช้กับหน้าเข้าสู่ระบบ Header และ Footer ของผู้ใช้งานทุกคนใน Tenant นี้</p>
+              </aside>
+            </div>
+          </div>`;
+        const brand = await this.loadBranding();
+        this.populateBrandForm(brand);
+      },
+
+      populateBrandForm(brand) {
+        if (!brand || !document.getElementById('brand-input-name')) return;
+        document.getElementById('brand-input-name').value = brand.systemName || '';
+        document.getElementById('brand-input-tagline').value = brand.tagline || '';
+        document.getElementById('brand-input-icon').value = brand.logoIcon || 'notifications_active';
+        document.getElementById('brand-input-url').value = brand.logoUrl || '';
+        document.getElementById('brand-input-footer-primary').value = brand.footerPrimary || '';
+        document.getElementById('brand-input-footer-secondary').value = brand.footerSecondary || '';
+        this.previewBrandSettings();
+      },
+
+      selectBrandIcon(icon) {
+        document.getElementById('brand-input-icon').value = icon;
+        document.getElementById('brand-input-url').value = '';
+        this.previewBrandSettings();
+      },
+
+      getBrandFormData() {
+        return {
+          systemName: document.getElementById('brand-input-name').value.trim(),
+          tagline: document.getElementById('brand-input-tagline').value.trim(),
+          logoIcon: document.getElementById('brand-input-icon').value,
+          logoUrl: document.getElementById('brand-input-url').value.trim(),
+          footerPrimary: document.getElementById('brand-input-footer-primary').value.trim(),
+          footerSecondary: document.getElementById('brand-input-footer-secondary').value.trim()
+        };
+      },
+
+      previewBrandSettings() {
+        if (!document.getElementById('brand-preview-name')) return;
+        const brand = this.getBrandFormData();
+        document.querySelectorAll('.brand-icon-choice').forEach(button => button.classList.toggle('border-indigo-500', button.dataset.brandIcon === brand.logoIcon && !brand.logoUrl));
+        document.getElementById('brand-preview-name').textContent = brand.systemName || 'ชื่อระบบ';
+        document.getElementById('brand-preview-tagline').textContent = brand.tagline || 'ข้อความอธิบาย';
+        document.getElementById('brand-preview-footer-primary').textContent = brand.footerPrimary;
+        document.getElementById('brand-preview-footer-secondary').textContent = brand.footerSecondary;
+        document.getElementById('brand-preview-logo').innerHTML = brand.logoUrl
+          ? `<img src="${this.escapeHtml(brand.logoUrl)}" class="h-full w-full rounded-xl object-cover" alt="">`
+          : `<span class="material-icons-round text-white">${this.escapeHtml(brand.logoIcon)}</span>`;
+      },
+
+      async saveBrandSettings(event) {
+        event.preventDefault();
+        try {
+          const saved = await CMPE_API.call('branding.update', this.getBrandFormData());
+          this.brandSettings = saved;
+          this.applyBranding(saved);
+          this.populateBrandForm(saved);
+          this.showToast('บันทึกแบรนด์และเผยแพร่เรียบร้อยแล้ว', 'success');
+        } catch (error) {
+          this.showToast(error.message || 'บันทึกการตั้งค่าไม่สำเร็จ', 'error');
+        }
       },
 
       renderYearsView() {
@@ -3123,15 +3300,15 @@
         const header = document.getElementById('user-header-status');
         if (CMPE_STATE.sessionToken && username) {
           header.innerHTML = `
-            <div class="flex items-center space-x-2">
+            <div class="hidden items-center space-x-2 sm:flex">
               <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
               <span class="text-xs text-slate-300 font-medium">${username}</span>
             </div>
-            <button onclick="CMPE_UI.handleLogout()" class="text-xs text-indigo-400 font-semibold hover:underline">ออกจากระบบ</button>
+            <button onclick="CMPE_UI.handleLogout()" class="inline-flex items-center gap-1 rounded-lg px-2 py-2 text-xs font-semibold text-indigo-400 hover:bg-slate-900" aria-label="ออกจากระบบ"><span class="material-icons-round text-base sm:hidden">logout</span><span class="hidden sm:inline">ออกจากระบบ</span></button>
           `;
         } else {
           header.innerHTML = `
-            <span class="text-xs text-slate-500">ยังไม่ได้เข้าสู่ระบบ</span>
+            <span class="hidden text-xs text-slate-500 sm:inline">ยังไม่ได้เข้าสู่ระบบ</span>
           `;
         }
       }
