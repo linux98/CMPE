@@ -1254,7 +1254,7 @@ function apiDispatcher(requestEnvelope) {
       const roomSvc = new CompetitionRoomService(roomRepo);
       const scheduleSvc = new ScheduleApplicationService(scheduleRepo, scheduleConflictSvc);
       const readinessSvc = new OperationalReadinessService(new RegistrationRepository(), roomRepo, assignmentRepo);
-      const checkinSvc = new CheckInApplicationService(checkinRepo);
+      const checkinSvc = new CheckInApplicationService(checkinRepo, new RegistrationRepository());
       const announceSvc = new AnnouncementApplicationService(announcementRepo);
       
       if (action === "operations.judges.create") {
@@ -1305,6 +1305,13 @@ function apiDispatcher(requestEnvelope) {
         return CMPE_UTILITIES.successEnvelope(result, reqId);
       }
       
+      if (action === "operations.checkin.dashboard") {
+        if (actor.permissions.indexOf("checkin.record") === -1) {
+          return CMPE_UTILITIES.errorEnvelope("ERR_UNAUTHORIZED", "Missing checkin.record permission", [], reqId);
+        }
+        return CMPE_UTILITIES.successEnvelope(checkinSvc.dashboard(tenantId), reqId);
+      }
+
       if (action === "operations.checkin.record") {
         if (actor.permissions.indexOf("checkin.record") === -1) {
           return CMPE_UTILITIES.errorEnvelope("ERR_UNAUTHORIZED", "Missing checkin.record permission", [], reqId);

@@ -360,7 +360,8 @@
       isCacheable(action) {
         return action.endsWith('.list') ||
           action === 'competition.workspace.get' ||
-          action === 'analytics.dashboard.get';
+          action === 'analytics.dashboard.get' ||
+          action === 'operations.checkin.dashboard';
       },
 
       cacheKey(action, payload) {
@@ -1489,49 +1490,139 @@
       renderCheckInDashboardView() {
         const main = document.getElementById('main-content');
         main.innerHTML = `
-          <div class="w-full max-w-4xl space-y-6">
-            <div>
-              <h2 class="text-xl font-bold text-white">ลงทะเบียนรายงานตัวการแข่งขัน</h2>
-              <p class="text-xs text-slate-400">สแกนโค้ด บันทึกเวลาเข้าร่วมของทีมและกรรมการประเมิน</p>
+          <div class="w-full max-w-6xl space-y-5">
+            <div class="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+              <div>
+                <p class="mb-1 text-[10px] font-bold uppercase tracking-[.22em] text-indigo-400">On-site operations</p>
+                <h2 class="text-2xl font-bold text-white">ศูนย์รายงานตัวหน้างาน</h2>
+                <p class="mt-1 text-xs text-slate-400">ค้นหา ตรวจสอบ และยืนยันทีมเข้าแข่งขันจากหน้าจอเดียว</p>
+              </div>
+              <button onclick="CMPE_UI.loadCheckInDashboard(true)" class="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-700 px-4 py-2.5 text-xs font-semibold text-slate-300 hover:border-indigo-500 hover:text-white">
+                <span class="material-icons-round text-base">refresh</span> รีเฟรชข้อมูล
+              </button>
             </div>
-            
-            <div class="grid grid-cols-3 gap-6">
-              <div class="col-span-2 border border-slate-800 bg-slate-900/30 rounded-3xl p-6 space-y-4">
-                <h3 class="text-sm font-semibold text-white">กรอกรหัสยืนยันรายงานตัว</h3>
-                <div class="flex space-x-3">
-                  <input type="text" id="checkin-search-input" placeholder="ป้อนเลขที่ใบสมัคร (เช่น REG-2026...)" class="flex-grow px-4 py-3 bg-slate-950/50 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none focus:border-indigo-500" />
-                  <button onclick="CMPE_UI.executeManualCheckIn()" class="px-6 py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-sm font-semibold transition">รายงานตัว</button>
-                </div>
-              </div>
 
-              <div class="col-span-1 border border-slate-800 bg-slate-950/40 rounded-3xl p-6 space-y-4">
-                <h3 class="text-sm font-semibold text-white">สถานะการรายงานตัว</h3>
-                <div class="p-4 rounded-2xl bg-slate-900 border border-slate-800 text-center space-y-1">
-                  <span class="text-[10px] text-slate-500 font-bold uppercase tracking-wider">ทีมที่เข้าแข่งขัน</span>
-                  <p class="text-xl font-bold text-white">12 / 45 ทีม</p>
+            <div class="grid gap-4 lg:grid-cols-3">
+              <div class="rounded-3xl border border-indigo-500/30 bg-gradient-to-br from-indigo-500/10 to-fuchsia-500/5 p-5 lg:col-span-2">
+                <label for="checkin-search-input" class="text-sm font-semibold text-white">สแกน QR หรือค้นหาทีม</label>
+                <p class="mt-1 text-xs text-slate-400">รองรับเลขที่ใบสมัคร รหัสระบบ ชื่อโรงเรียน หรือชื่อกิจกรรม</p>
+                <div class="mt-4 flex flex-col gap-3 sm:flex-row">
+                  <div class="relative flex-grow">
+                    <span class="material-icons-round absolute left-4 top-3.5 text-slate-500">qr_code_scanner</span>
+                    <input type="search" id="checkin-search-input" autocomplete="off" oninput="CMPE_UI.filterCheckInRows()" onkeydown="if(event.key==='Enter'){event.preventDefault();CMPE_UI.executeManualCheckIn();}" placeholder="สแกนหรือพิมพ์เพื่อค้นหา..." class="w-full rounded-xl border border-slate-700 bg-slate-950/70 py-3 pl-12 pr-4 text-sm text-white outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500/20" />
+                  </div>
+                  <button onclick="CMPE_UI.executeManualCheckIn()" class="rounded-xl bg-indigo-600 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-indigo-950/40 transition hover:bg-indigo-500">
+                    ยืนยันรายงานตัว
+                  </button>
                 </div>
               </div>
+              <div class="rounded-3xl border border-slate-800 bg-slate-900/40 p-5">
+                <div class="flex items-start justify-between">
+                  <div><p class="text-xs text-slate-400">ความคืบหน้าวันนี้</p><p id="checkin-summary" class="mt-1 text-2xl font-bold text-white">— / — ทีม</p></div>
+                  <span class="material-icons-round rounded-xl bg-emerald-500/10 p-2 text-emerald-400">how_to_reg</span>
+                </div>
+                <div class="mt-4 h-2 overflow-hidden rounded-full bg-slate-800"><div id="checkin-progress" class="h-full w-0 rounded-full bg-gradient-to-r from-indigo-500 to-emerald-400 transition-all duration-500"></div></div>
+                <p id="checkin-pending" class="mt-2 text-xs text-slate-500">กำลังเตรียมข้อมูล...</p>
+              </div>
+            </div>
+
+            <div class="overflow-hidden rounded-3xl border border-slate-800 bg-slate-950/40">
+              <div class="flex items-center justify-between border-b border-slate-800 px-5 py-4">
+                <div><h3 class="text-sm font-semibold text-white">คิวทีมเข้าแข่งขัน</h3><p id="checkin-result-count" class="mt-0.5 text-[11px] text-slate-500">กำลังโหลดข้อมูล</p></div>
+                <select id="checkin-status-filter" onchange="CMPE_UI.filterCheckInRows()" class="rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-xs text-slate-300 outline-none focus:border-indigo-500">
+                  <option value="">ทุกสถานะ</option><option value="PENDING">รอรายงานตัว</option><option value="CHECKED_IN">รายงานตัวแล้ว</option>
+                </select>
+              </div>
+              <div id="checkin-rows" class="divide-y divide-slate-800"><div class="p-10 text-center text-sm text-slate-500">กำลังโหลดรายชื่อทีม...</div></div>
             </div>
           </div>
         `;
+        this.checkInRows = [];
+        this.loadCheckInDashboard();
+      },
+
+      async loadCheckInDashboard(forceRefresh) {
+        if (forceRefresh) CMPE_API.invalidateReadCache();
+        try {
+          const data = await CMPE_API.call('operations.checkin.dashboard', {});
+          this.checkInRows = (data && data.rows) || [];
+          const summary = (data && data.summary) || { total: 0, checkedIn: 0, pending: 0 };
+          const summaryEl = document.getElementById('checkin-summary');
+          if (!summaryEl) return;
+          summaryEl.textContent = `${summary.checkedIn} / ${summary.total} ทีม`;
+          document.getElementById('checkin-pending').textContent = summary.pending ? `เหลืออีก ${summary.pending} ทีมที่ยังไม่รายงานตัว` : 'ครบทุกทีมแล้ว';
+          document.getElementById('checkin-progress').style.width = `${summary.total ? Math.round(summary.checkedIn * 100 / summary.total) : 0}%`;
+          this.filterCheckInRows();
+          window.setTimeout(() => document.getElementById('checkin-search-input')?.focus(), 0);
+        } catch (error) {
+          const rows = document.getElementById('checkin-rows');
+          if (rows) rows.innerHTML = `<div class="p-10 text-center text-sm text-rose-300">โหลดข้อมูลรายงานตัวไม่สำเร็จ <button onclick="CMPE_UI.loadCheckInDashboard(true)" class="ml-2 underline">ลองใหม่</button></div>`;
+          this.showToast(error.message || 'โหลดข้อมูลรายงานตัวไม่สำเร็จ', 'error');
+        }
+      },
+
+      filterCheckInRows() {
+        const container = document.getElementById('checkin-rows');
+        if (!container) return;
+        const query = String(document.getElementById('checkin-search-input')?.value || '').trim().toLowerCase();
+        const status = document.getElementById('checkin-status-filter')?.value || '';
+        const rows = (this.checkInRows || []).filter(row => {
+          const matchesQuery = !query || [row.registrationNumber, row.registrationId, row.schoolNameTh, row.activityNameTh]
+            .some(value => String(value || '').toLowerCase().includes(query));
+          const matchesStatus = !status || (status === 'CHECKED_IN' ? row.checkedIn : !row.checkedIn);
+          return matchesQuery && matchesStatus;
+        });
+        document.getElementById('checkin-result-count').textContent = `แสดง ${rows.length} จาก ${(this.checkInRows || []).length} ทีม`;
+        if (!rows.length) {
+          container.innerHTML = `<div class="p-10 text-center"><span class="material-icons-round text-3xl text-slate-600">search_off</span><p class="mt-2 text-sm text-slate-400">ไม่พบทีมที่ตรงกับเงื่อนไข</p></div>`;
+          return;
+        }
+        container.innerHTML = rows.slice(0, 100).map(row => `
+          <div class="grid gap-3 px-5 py-4 transition hover:bg-slate-900/60 md:grid-cols-[120px_1fr_1fr_150px] md:items-center">
+            <div><p class="text-sm font-bold text-indigo-300">${this.escapeHtml(row.registrationNumber)}</p><p class="text-[10px] text-slate-600">เลขที่ใบสมัคร</p></div>
+            <div><p class="text-sm font-semibold text-white">${this.escapeHtml(row.schoolNameTh)}</p><p class="mt-0.5 text-xs text-slate-500">${this.escapeHtml(row.educationLevelNameTh)}</p></div>
+            <div><p class="text-sm text-slate-300">${this.escapeHtml(row.activityNameTh)}</p></div>
+            <div>${row.checkedIn
+              ? `<span class="inline-flex items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1.5 text-xs font-semibold text-emerald-300"><span class="material-icons-round text-sm">check_circle</span>รายงานตัวแล้ว</span><p class="mt-1 text-[10px] text-slate-500">${this.formatCheckInTime(row.checkinTimestamp)}</p>`
+              : `<button onclick="CMPE_UI.checkInRegistration('${this.escapeHtml(row.registrationId)}')" class="rounded-xl bg-indigo-600 px-4 py-2 text-xs font-semibold text-white hover:bg-indigo-500">รายงานตัว</button>`}</div>
+          </div>`).join('');
+      },
+
+      formatCheckInTime(value) {
+        if (!value) return '';
+        const date = new Date(value);
+        return Number.isNaN(date.getTime()) ? '' : `เวลา ${date.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })} น.`;
+      },
+
+      async checkInRegistration(reference) {
+        await CMPE_API.call('operations.checkin.record', {
+          registrationId: reference, subjectType: 'TEAM', checkinMethod: 'MANUAL'
+        });
+        CMPE_API.invalidateReadCache();
+        this.showToast('ยืนยันรายงานตัวเรียบร้อยแล้ว', 'success');
+        await this.loadCheckInDashboard(true);
       },
 
       async executeManualCheckIn() {
-        const code = document.getElementById('checkin-search-input').value;
+        const code = document.getElementById('checkin-search-input').value.trim();
         if (!code) {
           this.showToast('กรุณาระบุเลขที่ใบสมัคร', 'error');
           return;
         }
-
+        const matches = (this.checkInRows || []).filter(row =>
+          [row.registrationNumber, row.registrationId].some(value => String(value || '').toLowerCase() === code.toLowerCase())
+        );
+        if (!matches.length) {
+          this.showToast('ไม่พบเลขที่ใบสมัคร กรุณาเลือกทีมจากรายการ', 'error');
+          return;
+        }
+        if (matches[0].checkedIn) {
+          this.showToast('ทีมนี้รายงานตัวแล้ว ไม่ต้องบันทึกซ้ำ', 'error');
+          return;
+        }
         try {
-          await CMPE_API.call('operations.checkin.record', {
-            competitionId: 'EVT-2569-AREA',
-            registrationId: code,
-            subjectType: 'TEAM',
-            subjectId: code,
-            checkinMethod: 'MANUAL'
-          });
-          this.showToast('รายงานตัวเข้าแข่งขันเรียบร้อยแล้ว!', 'success');
+          await this.checkInRegistration(matches[0].registrationId);
+          document.getElementById('checkin-search-input').value = '';
         } catch (e) {
           this.showToast(e.message || 'รายงานตัวล้มเหลว', 'error');
         }

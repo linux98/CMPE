@@ -232,12 +232,85 @@ class OperationalReadinessService {
 }
 
 class CheckInApplicationService {
-  constructor(checkinRepo) {
+  constructor(checkinRepo, registrationRepo) {
     this.checkinRepo = checkinRepo;
+    this.registrationRepo = registrationRepo;
+  }
+
+  resolveRegistration_(reference, tenantId) {
+    const value = String(reference || "").trim().toLowerCase();
+    if (!value) return null;
+    return this.registrationRepo.findAll(tenantId).find(registration =>
+      String(registration.registrationId || "").toLowerCase() === value ||
+      String(registration.registrationNumber || "").toLowerCase() === value
+    ) || null;
+  }
+
+  dashboard(tenantId) {
+    const lookup = getRegistrationDisplayLookup_();
+    const registrations = this.registrationRepo.findAll(tenantId)
+      .filter(item => ["APPROVED", "CHECKED_IN", "COMPETED", "COMPLETED"].indexOf(item.registrationStatus) !== -1);
+    const logs = this.checkinRepo.findAll(tenantId);
+    const reversedIds = {};
+    logs.forEach(log => {
+      if (log.checkinStatus === "REVERSED" && log.reversalOfCheckinLogId) {
+        reversedIds[log.reversalOfCheckinLogId] = true;
+      }
+    });
+    const activeByRegistration = {};
+    logs.filter(log => log.checkinStatus === "CHECKED_IN" && !reversedIds[log.checkinLogId])
+      .sort((a, b) => String(b.checkinTimestamp).localeCompare(String(a.checkinTimestamp)))
+      .forEach(log => {
+        if (!activeByRegistration[log.registrationId]) activeByRegistration[log.registrationId] = log;
+      });
+    const rows = registrations.map(registration => {
+      const config = lookup.configs[registration.competitionCategoryConfigId] || [];
+      const activeLog = activeByRegistration[registration.registrationId] || null;
+      return {
+        registrationId: registration.registrationId,
+        registrationNumber: registration.registrationNumber || registration.registrationId,
+        schoolNameTh: lookup.schools[registration.schoolId] || registration.schoolId || "ไม่ระบุโรงเรียน",
+        activityNameTh: lookup.categories[config[0]] || "ไม่ระบุกิจกรรม",
+        educationLevelNameTh: lookup.levels[config[1]] || "",
+        competitionId: registration.competitionId,
+        checkedIn: Boolean(activeLog),
+        checkinLogId: activeLog ? activeLog.checkinLogId : "",
+        checkinTimestamp: activeLog ? activeLog.checkinTimestamp : ""
+      };
+    });
+    rows.sort((a, b) => Number(a.checkedIn) - Number(b.checkedIn) ||
+      String(a.registrationNumber).localeCompare(String(b.registrationNumber), "th"));
+    return {
+      summary: {
+        total: rows.length,
+        checkedIn: rows.filter(row => row.checkedIn).length,
+        pending: rows.filter(row => !row.checkedIn).length
+      },
+      rows: rows
+    };
   }
 
   recordCheckIn(payload, actor) {
-    const log = new CheckInLogEntity(payload);
+    const registration = this.resolveRegistration_(payload.registrationId || payload.registrationNumber, actor.tenantId);
+    if (!registration) throw new Error("ERR_REGISTRATION_NOT_FOUND");
+    if (["APPROVED", "CHECKED_IN", "COMPETED", "COMPLETED"].indexOf(registration.registrationStatus) === -1) {
+      throw new Error("ERR_REGISTRATION_NOT_APPROVED");
+    }
+    const active = this.checkinRepo.findByRegistration(registration.registrationId, actor.tenantId);
+    const reversedIds = {};
+    active.forEach(log => {
+      if (log.checkinStatus === "REVERSED") reversedIds[log.reversalOfCheckinLogId] = true;
+    });
+    if (active.some(log => log.checkinStatus === "CHECKED_IN" && !reversedIds[log.checkinLogId])) {
+      throw new Error("ERR_ALREADY_CHECKED_IN");
+    }
+    const normalized = Object.assign({}, payload, {
+      tenantId: actor.tenantId,
+      competitionId: registration.competitionId,
+      registrationId: registration.registrationId,
+      subjectId: registration.registrationId
+    });
+    const log = new CheckInLogEntity(normalized);
     log.checkinLogId = payload.checkinLogId || CMPE_UTILITIES.generateUuid();
     log.checkinStatus = "CHECKED_IN";
     log.checkinTimestamp = new Date().toISOString();
