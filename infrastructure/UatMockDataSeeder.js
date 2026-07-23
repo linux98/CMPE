@@ -1141,6 +1141,171 @@ const CMPE_UAT_MOCK_DATA_SEEDER = {
     this.batchWrite("feature_flags", flags, ctx);
   },
 
+  /**
+   * Creates a recoverable Drive backup, migrates retired identifiers, and
+   * rebuilds identity/RBAC master data with one canonical identifier scheme.
+   */
+  rebuildCanonicalIdentityAndRbac() {
+    const lock = LockService.getScriptLock();
+    lock.waitLock(30000);
+    try {
+      const source = SpreadsheetApp.openById(CMPE_ENVIRONMENT.getSpreadsheetId());
+      const stamp = Utilities.formatDate(new Date(), "Asia/Bangkok", "yyyyMMdd-HHmmss");
+      const backup = SpreadsheetApp.create(`CMPE Identity RBAC Backup ${stamp}`);
+      const targets = ["tenants", "roles", "permissions", "role_permissions", "user_roles", "academic_years"];
+
+      targets.forEach((name, index) => {
+        const sourceSheet = source.getSheetByName(name);
+        if (!sourceSheet) return;
+        const backupSheet = index === 0 ? backup.getSheets()[0].setName(name) : backup.insertSheet(name);
+        const values = sourceSheet.getDataRange().getValues();
+        backupSheet.getRange(1, 1, values.length, values[0].length).setValues(values);
+      });
+
+      const tenantMap = {
+        SESAO_SAKON: "sakon1234", SESAO_UDON: "udon1234",
+        SESAO_KHONKAEN: "kk1234", SESAO_KORAT: "korat1234",
+        SESAO_SURIN: "surin1234"
+      };
+      let tenantReferencesMigrated = 0;
+      let academicYearReferencesMigrated = 0;
+      source.getSheets().forEach(sheet => {
+        if (sheet.getLastRow() < 2) return;
+        const values = sheet.getDataRange().getValues();
+        const headers = values[0].map(String);
+        let changed = false;
+        headers.forEach((header, col) => {
+          if (!["tenantId", "scope", "academicYearId"].includes(header)) return;
+          for (let row = 1; row < values.length; row += 1) {
+            const current = String(values[row][col] || "");
+            if ((header === "tenantId" || header === "scope") && tenantMap[current]) {
+              values[row][col] = tenantMap[current];
+              tenantReferencesMigrated += 1;
+              changed = true;
+            } else if (header === "academicYearId" && current === "AY_2569") {
+              values[row][col] = "AY-2569";
+              academicYearReferencesMigrated += 1;
+              changed = true;
+            }
+          }
+        });
+        if (changed) sheet.getRange(2, 1, values.length - 1, values[0].length).setValues(values.slice(1));
+      });
+
+      const now = new Date().toISOString();
+      const actor = "CANONICAL_IDENTITY_REPAIR";
+      const tenants = source.getSheetByName("tenants");
+      const tenantValues = tenants.getDataRange().getValues();
+      const tenantIdCol = tenantValues[0].indexOf("tenantId");
+      const canonicalIds = Object.values(tenantMap);
+      const passwordHashCol = tenantValues[0].indexOf("adminPasswordHash");
+      const canonicalTenants = canonicalIds.map(id => {
+        const candidates = tenantValues.slice(1).filter(row => String(row[tenantIdCol]) === id);
+        candidates.sort((a, b) =>
+          String(b[passwordHashCol] || "").length - String(a[passwordHashCol] || "").length
+        );
+        return candidates[0];
+      }).filter(Boolean);
+      if (canonicalTenants.length !== 5) {
+        throw new Error(`Expected 5 canonical tenants, found ${canonicalTenants.length}. Backup: ${backup.getUrl()}`);
+      }
+      this.replaceSheetRows_(tenants, tenantValues[0], canonicalTenants);
+
+      const roleCodes = [
+        "SUPER_ADMIN", "TENANT_ADMIN", "COMPETITION_MANAGER", "REGISTRATION_OFFICER",
+        "SCHOOL_ADMIN", "TEACHER", "JUDGE", "VENUE_MANAGER",
+        "CERTIFICATE_OFFICER", "AUDITOR", "VIEWER"
+      ];
+      const roles = source.getSheetByName("roles");
+      const roleRows = roleCodes.map(code => this.canonicalMutableRow_(
+        roles, { roleId: `ROLE-${code}`, roleCode: code, name: `System Role ${code}`, tenantId: "sakon1234" }, now, actor
+      ));
+      this.replaceSheetRows_(roles, null, roleRows);
+
+      const permissions = source.getSheetByName("permissions");
+      const permissionRows = CMPE_CONSTANTS.AllPermissions.map(code => this.canonicalMutableRow_(
+        permissions,
+        { permissionId: this.permissionId_(code), permissionCode: code, name: code, tenantId: "sakon1234" },
+        now, actor
+      ));
+      this.replaceSheetRows_(permissions, null, permissionRows);
+
+      const policies = {
+        SUPER_ADMIN: () => true,
+        TENANT_ADMIN: () => true,
+        COMPETITION_MANAGER: code => !/^(system|tenant)\./.test(code),
+        REGISTRATION_OFFICER: code => /^(registration|registrationMember|registrationCoach|school|province|district|academicYear|checkin|dashboard|report)\./.test(code),
+        SCHOOL_ADMIN: code => /^(registration\.(readOwnSchool|create|submit)|registrationMember|registrationCoach|appeal|dashboard\.readOwnSchool|report\.readOwn|certificate\.download|school\.read)/.test(code),
+        TEACHER: code => /^(registration\.(readOwnSchool|create|submit)|registrationMember|registrationCoach|appeal|dashboard\.readOwnSchool|report\.readOwn|certificate\.download)/.test(code),
+        JUDGE: code => /^(judge\.read|score\.(enter|updateOwnDraft|submit)|dashboard\.readTenant)/.test(code),
+        VENUE_MANAGER: code => /^(venue|competitionRoom|roomSchedule|operationalReadiness|checkin|announcement|dashboard)\./.test(code),
+        CERTIFICATE_OFFICER: code => /^(certificate|dashboard|report|leaderboard)\./.test(code),
+        AUDITOR: code => /^(audit|dashboard|report|leaderboard|notification\.readTenant)/.test(code),
+        VIEWER: code => /^(dashboard\.readOwnSchool|leaderboard\.readInternal|report\.readOwn)$/.test(code)
+      };
+      const rolePermissions = source.getSheetByName("role_permissions");
+      const rolePermissionRows = [];
+      roleCodes.forEach(roleCode => {
+        CMPE_CONSTANTS.AllPermissions.filter(policies[roleCode]).forEach(permissionCode => {
+          const permissionId = this.permissionId_(permissionCode);
+          rolePermissionRows.push(this.canonicalMutableRow_(rolePermissions, {
+            rolePermissionId: `RP-${roleCode}-${permissionId.substring(5)}`,
+            roleId: `ROLE-${roleCode}`,
+            permissionId,
+            tenantId: "sakon1234"
+          }, now, actor));
+        });
+      });
+      this.replaceSheetRows_(rolePermissions, null, rolePermissionRows);
+
+      const years = source.getSheetByName("academic_years");
+      const yearValues = years.getDataRange().getValues();
+      const yearIdCol = yearValues[0].indexOf("academicYearId");
+      const canonicalYears = ["AY-2569", "AY-2568"].map(id =>
+        yearValues.slice(1).find(row => String(row[yearIdCol]) === id)
+      ).filter(Boolean);
+      this.replaceSheetRows_(years, yearValues[0], canonicalYears);
+
+      return {
+        success: true,
+        backupSpreadsheetId: backup.getId(),
+        backupUrl: backup.getUrl(),
+        counts: {
+          tenants: canonicalTenants.length, roles: roleRows.length,
+          permissions: permissionRows.length, rolePermissions: rolePermissionRows.length,
+          academicYears: canonicalYears.length
+        },
+        tenantReferencesMigrated,
+        academicYearReferencesMigrated
+      };
+    } finally {
+      lock.releaseLock();
+    }
+  },
+
+  permissionId_(code) {
+    return `PERM-${code.replace(/[^A-Za-z0-9]+/g, "-").toUpperCase()}`;
+  },
+
+  canonicalMutableRow_(sheet, record, now, actor) {
+    const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    const metadata = {
+      createdTimestamp: now, createdBy: actor, lastModifiedTimestamp: now,
+      lastModifiedBy: actor, rowVersion: 1, recordStatus: "ACTIVE",
+      deletedTimestamp: "", deletedBy: ""
+    };
+    return headers.map(header => Object.prototype.hasOwnProperty.call(record, header)
+      ? record[header]
+      : (Object.prototype.hasOwnProperty.call(metadata, header) ? metadata[header] : ""));
+  },
+
+  replaceSheetRows_(sheet, headers, rows) {
+    const actualHeaders = headers || sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    sheet.clearContents();
+    sheet.getRange(1, 1, 1, actualHeaders.length).setValues([actualHeaders]);
+    if (rows.length) sheet.getRange(2, 1, rows.length, actualHeaders.length).setValues(rows);
+  },
+
   // --- REPOSITORIES UTILITY ADAPTERS ---
 
   batchWrite(sheetName, records, ctx) {
@@ -1422,6 +1587,10 @@ function repairMissingTenantIds() {
   return CMPE_UAT_MOCK_DATA_SEEDER.repairMissingTenantIds();
 }
 
+function rebuildCanonicalIdentityAndRbac() {
+  return CMPE_UAT_MOCK_DATA_SEEDER.rebuildCanonicalIdentityAndRbac();
+}
+
 if (typeof global !== "undefined") {
   global.CMPE_UAT_MOCK_DATA_SEEDER = CMPE_UAT_MOCK_DATA_SEEDER;
   global.seedUatMockData = seedUatMockData;
@@ -1431,4 +1600,5 @@ if (typeof global !== "undefined") {
   global.getUatSeedSummary = getUatSeedSummary;
   global.getUatDemoCredentials = getUatDemoCredentials;
   global.repairMissingTenantIds = repairMissingTenantIds;
+  global.rebuildCanonicalIdentityAndRbac = rebuildCanonicalIdentityAndRbac;
 }

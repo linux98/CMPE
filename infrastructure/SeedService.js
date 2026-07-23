@@ -8,8 +8,12 @@ const CMPE_SEED_SERVICE = {
    * Seed static directories and default configurations safely.
    */
   seedAllDefaults() {
-    const actorContext = { userId: "SYSTEM", tenantId: "SESAO_SAKON", roles: ["SUPER_ADMIN"] };
+    const actorContext = { userId: "SYSTEM", tenantId: "sakon1234", roles: ["SUPER_ADMIN"] };
     
+    // Identity/RBAC is seeded exclusively by the canonical master-data seeder.
+    // Keep the former definitions unreachable for compatibility with old test
+    // snapshots while preventing duplicate underscore identifiers.
+    if (false) {
     // 1. Seed Roles
     const rolesRepo = new BaseRepository("roles");
     const rolesList = [
@@ -68,36 +72,15 @@ const CMPE_SEED_SERVICE = {
       }
     });
 
-    // 4. Seed Tenants
-    const tenantsRepo = new BaseRepository("tenants");
-    const passwordHasher = new PasswordHasher();
-    const tenantsList = [
-      { tenantId: "SESAO_SAKON", name: "สพม.สกลนคร (เจ้าภาพหลัก)", province: "สกลนคร", adminUsername: "admin_sakon", adminPasswordHash: passwordHasher.hash("sakon1234", "SESAO_SAKON", 1000), status: "ACTIVE" },
-      { tenantId: "SESAO_UDON", name: "สพม.อุดรธานี", province: "อุดรธานี", adminUsername: "admin_udon", adminPasswordHash: passwordHasher.hash("udon1234", "SESAO_UDON", 1000), status: "ACTIVE" },
-      { tenantId: "SESAO_KHONKAEN", name: "สพม.ขอนแก่น", province: "ขอนแก่น", adminUsername: "admin_kk", adminPasswordHash: passwordHasher.hash("kk1234", "SESAO_KHONKAEN", 1000), status: "ACTIVE" },
-      { tenantId: "SESAO_KORAT", name: "สพม.นครราชสีมา", province: "นครราชสีมา", adminUsername: "admin_korat", adminPasswordHash: passwordHasher.hash("korat1234", "SESAO_KORAT", 1000), status: "ACTIVE" },
-      { tenantId: "SESAO_SURIN", name: "สพม.สุรินทร์", province: "สุรินทร์", adminUsername: "admin_surin", adminPasswordHash: passwordHasher.hash("surin1234", "SESAO_SURIN", 1000), status: "ACTIVE" }
-    ];
-    tenantsList.forEach(t => {
-      if (!tenantsRepo.exists({ tenantId: t.tenantId }, null)) {
-        tenantsRepo.create(t, actorContext);
-      } else {
-        const existing = tenantsRepo.findOne({ tenantId: t.tenantId }, null);
-        if (existing) {
-          const pass = existing.adminPasswordHash;
-          const isPlaintext = pass === "HASH_PLACEHOLDER" || pass.length < 20 || pass === "sakon1234" || pass === "udon1234" || pass === "kk1234" || pass === "korat1234" || pass === "surin1234";
-          if (isPlaintext) {
-            existing.adminPasswordHash = t.adminPasswordHash;
-            tenantsRepo.update({ tenantId: t.tenantId }, existing, actorContext);
-          }
-        }
-      }
-    });
+    }
+
+    // Canonical tenants are owned by the master-data/UAT seeder. This service
+    // must not recreate the retired SESAO_* identifiers.
 
     // 5. Seed Academic Year
     const yearRepo = new BaseRepository("academic_years");
-    if (!yearRepo.exists({ academicYearId: "AY_2569" }, null)) {
-      yearRepo.create({ academicYearId: "AY_2569", yearValue: "2569", status: "ACTIVE" }, actorContext);
+    if (!yearRepo.exists({ academicYearId: "AY-2569" }, null)) {
+      yearRepo.create({ academicYearId: "AY-2569", yearValue: "2569", status: "ACTIVE", isCurrent: "true" }, actorContext);
     }
 
     // 6. Seed Education Levels
