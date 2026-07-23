@@ -59,6 +59,22 @@ class BaseRepository {
   }
 
   /**
+   * Lists active records, optionally constrained to one tenant.
+   */
+  findAll(tenantContext) {
+    const sheet = this.getSheet();
+    if (!sheet || sheet.getLastRow() <= 1) return [];
+    const headerMap = this.getHeaderMap(sheet);
+    const data = sheet.getRange(2, 1, sheet.getLastRow() - 1, sheet.getLastColumn()).getValues();
+    const tenantIndex = headerMap.tenantId ? headerMap.tenantId - 1 : -1;
+    const statusIndex = headerMap.recordStatus ? headerMap.recordStatus - 1 : -1;
+    return data.filter(row =>
+      (tenantIndex === -1 || !tenantContext || row[tenantIndex] === tenantContext) &&
+      (statusIndex === -1 || row[statusIndex] !== "DELETED")
+    ).map(row => this.mapRowToObject(row, headerMap));
+  }
+
+  /**
    * Find by Technical Primary Key (Tenant isolated check included)
    */
   findById(id, tenantContext) {

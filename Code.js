@@ -719,7 +719,11 @@ function apiDispatcher(requestEnvelope) {
       const reviewSvc = new RegistrationReviewService(regRepo, historyRepo);
       
       if (action === "registration.list") {
-        const list = regRepo.findBySchool(payload.schoolId || actor.schoolId, tenantId);
+        const requestedSchoolId = payload.schoolId || actor.schoolId;
+        const canReadTenant = actor.permissions.indexOf("registration.readTenant") !== -1;
+        const list = requestedSchoolId
+          ? regRepo.findBySchool(requestedSchoolId, tenantId)
+          : (canReadTenant ? regRepo.findAll(tenantId) : []);
         return CMPE_UTILITIES.successEnvelope(list, reqId);
       }
       if (action === "registration.get") {
@@ -811,6 +815,14 @@ function apiDispatcher(requestEnvelope) {
         }
         const created = judgeAppSvc.createJudge(payload, actor);
         return CMPE_UTILITIES.successEnvelope(created, reqId);
+      }
+
+      if (action === "operations.judges.list") {
+        return CMPE_UTILITIES.successEnvelope(judgeRepo.findAll(tenantId), reqId);
+      }
+
+      if (action === "operations.assignments.list") {
+        return CMPE_UTILITIES.successEnvelope(assignmentRepo.findAll(tenantId), reqId);
       }
       
       if (action === "operations.assignments.create") {

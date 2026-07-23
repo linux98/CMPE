@@ -1283,6 +1283,86 @@ const CMPE_UAT_MOCK_DATA_SEEDER = {
     }
   },
 
+  /**
+   * Completes workflow tables that older UAT seed versions left empty.
+   * Existing primary keys are updated in place, so repeated runs are safe.
+   */
+  seedMissingWorkflowDemoData() {
+    const ss = SpreadsheetApp.openById(CMPE_ENVIRONMENT.getSpreadsheetId());
+    const ctx = {
+      ss,
+      seedRegistry: {},
+      actor: { userId: "WORKFLOW_DEMO_SEED", tenantId: "sakon1234" }
+    };
+    const eventIds = ["EVT-2569-AREA", "EVT-2569-CLUSTER", "EVT-2568-HISTORY"];
+    const rounds = eventIds.map(eventId => ({
+      competitionRoundId: `RD-${eventId}-1`,
+      competitionId: eventId,
+      roundSequence: 1,
+      nameTh: "รอบการแข่งขันหลัก",
+      nameEn: "Main Competition Round",
+      status: eventId === "EVT-2568-HISTORY" ? "COMPLETED" : "ACTIVE"
+    }));
+    this.batchWrite("competition_rounds", rounds, ctx);
+
+    const assignments = [];
+    eventIds.forEach(eventId => {
+      for (let schoolIndex = 2; schoolIndex <= 14; schoolIndex += 2) {
+        for (let itemIndex = 1; itemIndex <= 4; itemIndex += 1) {
+          const judgeNumber = ((schoolIndex + itemIndex) % 5) + 1;
+          assignments.push({
+            judgeAssignmentId: `ASG-${eventId}-${schoolIndex}-${itemIndex}`,
+            judgeId: `JDG-${judgeNumber}`,
+            competitionId: eventId,
+            competitionRoundId: `RD-${eventId}-1`,
+            competitionCategoryConfigId: `CONFIG-${eventId}-${itemIndex}`,
+            competitionRoomId: `ROOM-VEN-SAKON-${(schoolIndex % 4) + 1}-1`,
+            roomScheduleId: `SCHED-${eventId}-${schoolIndex}-${itemIndex}`,
+            judgeRole: itemIndex === 1 ? "CHIEF_JUDGE" : "SCORE_JUDGE",
+            assignmentStatus: "CONFIRMED",
+            assignmentStartTimestamp: eventId === "EVT-2568-HISTORY" ? "2025-11-16T08:30:00Z" : "2026-11-16T08:30:00Z",
+            assignmentEndTimestamp: eventId === "EVT-2568-HISTORY" ? "2025-11-16T12:00:00Z" : "2026-11-16T12:00:00Z",
+            assignedBy: "WORKFLOW_DEMO_SEED",
+            assignmentNotes: "ข้อมูลสาธิตสำหรับกระบวนการให้คะแนน"
+          });
+        }
+      }
+    });
+    this.batchWrite("judge_assignments", assignments, ctx);
+
+    const appeals = [
+      {
+        appealId: "APL-DEMO-001", competitionId: "EVT-2569-AREA",
+        registrationId: "REG-EVT-2569-AREA-2-1",
+        reason: "ขอตรวจสอบผลรวมคะแนนตามเกณฑ์อีกครั้ง",
+        evidenceUrl: "", appealStatus: "SUBMITTED", reviewerId: "", resolutionNotes: ""
+      },
+      {
+        appealId: "APL-DEMO-002", competitionId: "EVT-2569-CLUSTER",
+        registrationId: "REG-EVT-2569-CLUSTER-4-2",
+        reason: "เอกสารหลักฐานคะแนนไม่ตรงกับผลที่ประกาศ",
+        evidenceUrl: "", appealStatus: "UNDER_REVIEW", reviewerId: "USR-MGR-SAKON", resolutionNotes: ""
+      },
+      {
+        appealId: "APL-DEMO-003", competitionId: "EVT-2568-HISTORY",
+        registrationId: "REG-EVT-2568-HISTORY-6-3",
+        reason: "ตัวอย่างคำร้องที่ดำเนินการเสร็จแล้ว",
+        evidenceUrl: "", appealStatus: "RESOLVED", reviewerId: "USR-MGR-SAKON",
+        resolutionNotes: "ตรวจสอบแล้ว ผลคะแนนถูกต้อง"
+      }
+    ];
+    this.batchWrite("appeals", appeals, ctx);
+
+    return {
+      success: true,
+      insertedOrUpdated: {
+        competitionRounds: rounds.length,
+        judgeAssignments: assignments.length,
+        appeals: appeals.length
+      }
+    };
+  },
+
   permissionId_(code) {
     return `PERM-${code.replace(/[^A-Za-z0-9]+/g, "-").toUpperCase()}`;
   },
@@ -1591,6 +1671,10 @@ function rebuildCanonicalIdentityAndRbac() {
   return CMPE_UAT_MOCK_DATA_SEEDER.rebuildCanonicalIdentityAndRbac();
 }
 
+function seedMissingWorkflowDemoData() {
+  return CMPE_UAT_MOCK_DATA_SEEDER.seedMissingWorkflowDemoData();
+}
+
 if (typeof global !== "undefined") {
   global.CMPE_UAT_MOCK_DATA_SEEDER = CMPE_UAT_MOCK_DATA_SEEDER;
   global.seedUatMockData = seedUatMockData;
@@ -1601,4 +1685,5 @@ if (typeof global !== "undefined") {
   global.getUatDemoCredentials = getUatDemoCredentials;
   global.repairMissingTenantIds = repairMissingTenantIds;
   global.rebuildCanonicalIdentityAndRbac = rebuildCanonicalIdentityAndRbac;
+  global.seedMissingWorkflowDemoData = seedMissingWorkflowDemoData;
 }

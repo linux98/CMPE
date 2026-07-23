@@ -51,6 +51,21 @@
         radial-gradient(at 100% 0%, rgba(244, 63, 94, 0.08) 0, transparent 50%);
       background-attachment: fixed;
     }
+
+    /* Auth screens stay centered; authenticated workspaces begin directly
+       below the app bar so headings and tables are visible without dead space. */
+    #app-sidebar:not(.hidden) + #main-content {
+      align-items: flex-start;
+      justify-content: center;
+      padding-top: 2rem;
+      overflow-y: auto;
+    }
+
+    @media (max-width: 900px) {
+      #app-sidebar:not(.hidden) + #main-content {
+        padding: 1.25rem;
+      }
+    }
   </style>
 </head>
 <body class="text-slate-200 min-h-screen flex flex-col font-sans">
@@ -565,7 +580,7 @@
                         <span class="text-xs font-bold text-white">REGISTRATION_APPROVED</span>
                         <span class="text-[10px] text-slate-500">1 นาทีที่ผ่านมา</span>
                       </div>
-                      <p class="text-xs text-slate-400">ใบสมัครสอบ REG_STAGE7_TEST ได้รับการอนุมัติและล็อกโควตาเข้าปฏิบัติการตรวจสอบแข่งขันแล้ว</p>
+                      <p class="text-xs text-slate-400">ใบสมัคร REG-EVT-2569-AREA-2-1 ได้รับการอนุมัติและเข้าสู่กระบวนการแข่งขันแล้ว</p>
                     </div>
                   </div>
                 </div>
@@ -695,7 +710,7 @@
                   <tr class="border-b border-slate-900 hover:bg-slate-900/20">
                     <td class="px-6 py-4 font-bold text-white">หุ่นยนต์พื้นฐาน ม.ต้น</td>
                     <td class="px-6 py-4">ห้องแล็บวิทย์ 01</td>
-                    <td class="px-6 py-4 font-mono text-xs text-indigo-400">REG_STAGE7_TEST</td>
+                    <td class="px-6 py-4 font-mono text-xs text-indigo-400">REG-EVT-2569-AREA-2-1</td>
                     <td class="px-6 py-4 text-right">
                       <button onclick="CMPE_UI.initializeAndGoToScorecard()" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold transition">กรอกคะแนน</button>
                     </td>
@@ -705,20 +720,44 @@
             </div>
           </div>
         `;
+        this.loadScoringAssignments();
+      },
+
+      async loadScoringAssignments() {
+        const tbody = document.getElementById('assignments-table-body');
+        if (!tbody) return;
+        try {
+          const list = await CMPE_API.call('operations.assignments.list');
+          if (!list.length) {
+            tbody.innerHTML = `<tr><td colspan="4" class="text-center py-10 text-slate-500">ยังไม่มีรายการมอบหมายกรรมการ</td></tr>`;
+            return;
+          }
+          tbody.innerHTML = list.slice(0, 30).map(a => `
+            <tr class="border-b border-slate-900 hover:bg-slate-900/20">
+              <td class="px-6 py-4 font-medium text-white">${a.competitionCategoryConfigId || '-'}</td>
+              <td class="px-6 py-4">${a.competitionRoomId || '-'}</td>
+              <td class="px-6 py-4 font-mono text-xs text-indigo-400">${a.judgeId}</td>
+              <td class="px-6 py-4 text-right"><span class="px-2 py-1 rounded-full text-[10px] bg-emerald-500/10 text-emerald-400">${a.assignmentStatus}</span></td>
+            </tr>
+          `).join('');
+        } catch (e) {
+          tbody.innerHTML = `<tr><td colspan="4" class="text-center py-10 text-rose-400">ไม่สามารถโหลดรายการมอบหมายได้</td></tr>`;
+          this.showToast(e.message || 'โหลดรายการมอบหมายกรรมการไม่สำเร็จ', 'error');
+        }
       },
 
       async initializeAndGoToScorecard() {
         try {
           const res = await CMPE_API.call('scoring.scorecards.initialize', {
-            scorecardId: 'SC_TEST_01',
-            registrationId: 'REG_STAGE7_TEST',
-            judgeId: 'JDG_TEST_01',
-            scoreTemplateId: 'TEMP_STAGE4_TEST'
+            scorecardId: 'CARD-EVT-2569-AREA-2-1',
+            registrationId: 'REG-EVT-2569-AREA-2-1',
+            judgeId: 'JDG-1',
+            scoreTemplateId: 'TEMP-STANDARD'
           });
-          this.navigateTo(`scorecard-entry-SC_TEST_01`);
+          this.navigateTo(`scorecard-entry-CARD-EVT-2569-AREA-2-1`);
         } catch (e) {
           // If already exists, just redirect to entry
-          this.navigateTo(`scorecard-entry-SC_TEST_01`);
+          this.navigateTo(`scorecard-entry-CARD-EVT-2569-AREA-2-1`);
         }
       },
 
@@ -745,7 +784,7 @@
                 <h3 class="text-sm font-semibold text-white">เกณฑ์ประเมินคะแนนแยกรายบุคคล</h3>
                 <div class="space-y-4">
                   <div class="p-4 bg-slate-950/50 border border-slate-800 rounded-2xl space-y-2">
-                    <label class="text-xs text-slate-400 font-bold">ROBOT_SPEED (คะแนนความเร็วหุ่นยนต์ 0 - 100)</label>
+                    <label class="text-xs text-slate-400 font-bold">REQ (ความถูกต้องครบถ้วน 0 - 20)</label>
                     <input type="number" id="detail-score-input" value="85" class="w-full px-4 py-3 bg-slate-900 border border-slate-800 rounded-xl text-sm focus:outline-none focus:border-indigo-500 text-slate-200" />
                   </div>
                 </div>
@@ -771,8 +810,8 @@
             scorecardId: scId,
             detailsList: [
               {
-                scoreCriterionId: 'CRIT_01',
-                criterionCode: 'ROBOT_SPEED',
+                scoreCriterionId: 'CRT-1',
+                criterionCode: 'REQ',
                 rawScore: detailVal
               }
             ]
@@ -811,7 +850,7 @@
                 </thead>
                 <tbody>
                   <tr class="border-b border-slate-900 hover:bg-slate-900/20">
-                    <td class="px-6 py-4 font-mono text-xs text-indigo-400">REG_STAGE7_TEST</td>
+                    <td class="px-6 py-4 font-mono text-xs text-indigo-400">REG-EVT-2569-AREA-2-1</td>
                     <td class="px-6 py-4 font-bold text-yellow-400">GOLD (เหรียญทอง)</td>
                     <td class="px-6 py-4 text-emerald-400 font-semibold">ปกติ (Normal)</td>
                     <td class="px-6 py-4 text-right space-x-2">
@@ -827,8 +866,8 @@
 
       async executeChiefVerify() {
         try {
-          await CMPE_API.call('scoring.review.verify', { registrationId: 'REG_STAGE7_TEST' });
-          await CMPE_API.call('scoring.results.hardLock', { registrationId: 'REG_STAGE7_TEST' });
+          await CMPE_API.call('scoring.review.verify', { registrationId: 'REG-EVT-2569-AREA-2-1' });
+          await CMPE_API.call('scoring.results.hardLock', { registrationId: 'REG-EVT-2569-AREA-2-1' });
           this.showToast('ยืนยันและ Hard Lock ผลคะแนนสำเร็จ!', 'success');
           this.renderChiefReviewQueue();
         } catch (e) {
@@ -850,7 +889,7 @@
             <div class="border border-slate-800 bg-slate-900/30 rounded-3xl p-6 space-y-4">
               <div class="space-y-1">
                 <label class="text-xs text-slate-400">ระบุเลขใบสมัครเพื่อร้องเรียน</label>
-                <input type="text" id="appeal-reg-input" value="REG_STAGE7_TEST" class="w-full px-4 py-3 bg-slate-950/50 border border-slate-800 rounded-xl text-sm focus:outline-none focus:border-indigo-500 text-slate-200" />
+                <input type="text" id="appeal-reg-input" value="REG-EVT-2569-AREA-2-1" class="w-full px-4 py-3 bg-slate-950/50 border border-slate-800 rounded-xl text-sm focus:outline-none focus:border-indigo-500 text-slate-200" />
               </div>
               <div class="space-y-1">
                 <label class="text-xs text-slate-400">รายละเอียดและเหตุผลข้อคัดค้าน</label>
@@ -874,7 +913,7 @@
         try {
           await CMPE_API.call('appeals.submit', {
             registrationId: regId,
-            competitionId: 'COMP_STAGE4_TEST_01',
+            competitionId: 'EVT-2569-AREA',
             reason: reason
           });
           this.showToast('ยื่นคำร้องคัดค้านเรียบร้อยแล้ว!', 'success');
@@ -917,6 +956,30 @@
             </div>
           </div>
         `;
+        this.loadJudgesDirectory();
+      },
+
+      async loadJudgesDirectory() {
+        const tbody = document.getElementById('judges-table-body');
+        if (!tbody) return;
+        try {
+          const list = await CMPE_API.call('operations.judges.list');
+          if (!list.length) {
+            tbody.innerHTML = `<tr><td colspan="4" class="text-center py-10 text-slate-500">ยังไม่มีข้อมูลกรรมการ</td></tr>`;
+            return;
+          }
+          tbody.innerHTML = list.map(j => `
+            <tr class="border-b border-slate-900 hover:bg-slate-900/20">
+              <td class="px-6 py-4 font-mono text-xs text-indigo-400">${j.judgeCode}</td>
+              <td class="px-6 py-4 font-medium text-white">${j.displayName || `${j.firstNameTh || ''} ${j.lastNameTh || ''}`}</td>
+              <td class="px-6 py-4">${j.positionName || '-'}</td>
+              <td class="px-6 py-4"><span class="px-2 py-1 rounded-full text-[10px] bg-emerald-500/10 text-emerald-400">${j.judgeStatus}</span></td>
+            </tr>
+          `).join('');
+        } catch (e) {
+          tbody.innerHTML = `<tr><td colspan="4" class="text-center py-10 text-rose-400">ไม่สามารถโหลดข้อมูลกรรมการได้</td></tr>`;
+          this.showToast(e.message || 'โหลดข้อมูลกรรมการไม่สำเร็จ', 'error');
+        }
       },
 
       openCreateJudgeModal() {
@@ -1011,7 +1074,7 @@
 
         try {
           await CMPE_API.call('operations.checkin.record', {
-            competitionId: 'COMP_STAGE4_TEST_01',
+            competitionId: 'EVT-2569-AREA',
             registrationId: code,
             subjectType: 'TEAM',
             subjectId: code,
@@ -1094,7 +1157,7 @@
               <div class="space-y-1">
                 <label class="text-xs text-slate-400">เลือกประเภทกิจกรรมการแข่งขัน</label>
                 <select id="reg-config-select" class="w-full px-4 py-2.5 bg-slate-950/50 border border-slate-800 rounded-xl text-sm text-slate-300">
-                  <option value="CONF_STAGE4_TEST">การแข่งขันโครงงานหุ่นยนต์ระดับพื้นฐาน</option>
+                  <option value="CONFIG-EVT-2569-AREA-1">การแข่งขันโครงงานระดับพื้นที่</option>
                 </select>
               </div>
             </div>
@@ -1111,9 +1174,9 @@
         const configId = document.getElementById('reg-config-select').value;
         try {
           const res = await CMPE_API.call('registration.create', {
-            competitionId: 'COMP_STAGE4_TEST_01',
+            competitionId: 'EVT-2569-AREA',
             competitionCategoryConfigId: configId,
-            schoolId: 'SCH_SAKON_01'
+            schoolId: 'SCH-SAKON-1'
           });
           this.showToast('สร้างดราฟต์สำเร็จ!', 'success');
           document.getElementById('create-reg-modal').remove();
@@ -1386,7 +1449,7 @@
         `;
 
         try {
-          const list = await CMPE_API.call('registration.list', { schoolId: 'SCH_SAKON_01' });
+          const list = await CMPE_API.call('registration.list', {});
           const tbody = document.getElementById('reviews-table-body');
           const submissions = list.filter(r => r.registrationStatus === "SUBMITTED");
           
