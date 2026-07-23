@@ -191,7 +191,8 @@
         </div>
       </div>
       <p id="global-loading-label" class="mt-5 text-sm font-semibold text-white">กำลังโหลดข้อมูล</p>
-      <p class="mt-1 text-xs text-slate-400">กรุณารอสักครู่ ระบบกำลังประมวลผล</p>
+      <p id="global-loading-detail" class="mt-1 text-xs text-slate-400">กำลังเตรียมข้อมูลสำหรับหน้าจอนี้</p>
+      <p id="global-loading-elapsed" class="mt-2 text-[10px] tabular-nums text-indigo-300/80">ใช้เวลา 0 วินาที</p>
       <div class="mt-5 h-1.5 overflow-hidden rounded-full bg-slate-800">
         <div id="global-loading-bar" class="h-full w-0 rounded-full bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 transition-[width] duration-300"></div>
       </div>
@@ -214,10 +215,30 @@
       overlayRequests: 0,
       percent: 0,
       timer: null,
+      finishTimer: null,
       startedAt: 0,
       buttonStates: new WeakMap(),
 
       labelFor(action) {
+        const labels = {
+          'auth.me': 'กำลังตรวจสอบเซสชันและสิทธิ์ใช้งาน',
+          'master.schools.list': 'กำลังโหลดรายชื่อโรงเรียน',
+          'master.venues.list': 'กำลังโหลดสนามและสถานที่แข่งขัน',
+          'master.categories.list': 'กำลังโหลดหมวดหมู่การแข่งขัน',
+          'master.tenants.list': 'กำลังโหลดข้อมูลเขตพื้นที่',
+          'competition.list': 'กำลังโหลดรายการแข่งขัน',
+          'competition.rounds.list': 'กำลังโหลดรอบการแข่งขัน',
+          'competition.categories.list': 'กำลังโหลดการตั้งค่าหมวดการแข่งขัน',
+          'registration.list': 'กำลังโหลดใบสมัครการแข่งขัน',
+          'registration.get': 'กำลังโหลดรายละเอียดใบสมัคร',
+          'registration.members.list': 'กำลังโหลดรายชื่อนักเรียน',
+          'registration.coaches.list': 'กำลังโหลดรายชื่อผู้ฝึกสอน',
+          'operations.judges.list': 'กำลังโหลดทำเนียบกรรมการ',
+          'operations.assignments.list': 'กำลังโหลดงานที่มอบหมายให้กรรมการ',
+          'notification.inbox.list': 'กำลังโหลดกล่องข้อความแจ้งเตือน',
+          'notification.admin.list': 'กำลังโหลดคิวการแจ้งเตือน'
+        };
+        if (labels[action]) return labels[action];
         if (action.startsWith('auth.')) return action === 'auth.login' ? 'กำลังเข้าสู่ระบบ' : 'กำลังตรวจสอบสิทธิ์';
         if (action.includes('.list') || action === 'auth.me') return 'กำลังโหลดข้อมูล';
         if (action.includes('create') || action.includes('add')) return 'กำลังบันทึกข้อมูล';
@@ -264,6 +285,8 @@
         const percent = Math.min(100, Math.max(0, Math.round(this.percent)));
         document.getElementById('global-loading-percent').textContent = `${percent}%`;
         document.getElementById('global-loading-bar').style.width = `${percent}%`;
+        const seconds = Math.max(0, Math.floor((Date.now() - this.startedAt) / 1000));
+        document.getElementById('global-loading-elapsed').textContent = `ใช้เวลา ${seconds} วินาที`;
       },
 
       start(action) {
@@ -272,22 +295,33 @@
         this.setButtonLoading(token.button);
         this.activeRequests += 1;
         if (!token.overlay) return token;
+        const continuingBatch = Boolean(this.finishTimer);
+        if (this.finishTimer) {
+          window.clearTimeout(this.finishTimer);
+          this.finishTimer = null;
+        }
         this.overlayRequests += 1;
         const overlay = document.getElementById('global-loading-overlay');
         document.getElementById('global-loading-label').textContent = this.labelFor(action);
+        document.getElementById('global-loading-detail').textContent =
+          continuingBatch ? 'เสร็จหนึ่งขั้นตอนแล้ว กำลังทำขั้นตอนถัดไป' : 'กำลังเตรียมข้อมูลสำหรับหน้าจอนี้';
         if (this.overlayRequests === 1) {
-          this.startedAt = Date.now();
-          this.percent = 4;
-          overlay.classList.remove('hidden');
-          overlay.classList.add('flex');
-          this.render();
-          this.timer = window.setInterval(() => {
-            const remaining = 92 - this.percent;
-            if (remaining > 0) {
-              this.percent += Math.max(.35, remaining * .075);
+          if (!continuingBatch) {
+            this.startedAt = Date.now();
+            this.percent = 4;
+            overlay.classList.remove('hidden');
+            overlay.classList.add('flex');
+            this.render();
+          }
+          if (!this.timer) {
+            this.timer = window.setInterval(() => {
+              const remaining = 94 - this.percent;
+              if (remaining > 0) {
+                this.percent += Math.max(.25, remaining * .055);
+              }
               this.render();
-            }
-          }, 220);
+            }, 250);
+          }
         }
         return token;
       },
@@ -298,19 +332,25 @@
         if (!token || !token.overlay) return;
         this.overlayRequests = Math.max(0, this.overlayRequests - 1);
         if (this.overlayRequests > 0) return;
-        window.clearInterval(this.timer);
-        this.timer = null;
-        this.percent = 100;
-        this.render();
-        const elapsed = Date.now() - this.startedAt;
-        window.setTimeout(() => {
+        document.getElementById('global-loading-detail').textContent = 'กำลังตรวจสอบว่ามีข้อมูลส่วนถัดไปหรือไม่';
+        this.finishTimer = window.setTimeout(() => {
           if (this.overlayRequests !== 0) return;
-          const overlay = document.getElementById('global-loading-overlay');
-          overlay.classList.add('hidden');
-          overlay.classList.remove('flex');
-          this.percent = 0;
+          this.finishTimer = null;
+          window.clearInterval(this.timer);
+          this.timer = null;
+          this.percent = 100;
+          document.getElementById('global-loading-label').textContent = 'โหลดข้อมูลเรียบร้อยแล้ว';
+          document.getElementById('global-loading-detail').textContent = 'กำลังเปิดหน้าจอให้คุณ';
           this.render();
-        }, Math.max(180, 420 - elapsed));
+          window.setTimeout(() => {
+            if (this.overlayRequests !== 0 || this.finishTimer) return;
+            const overlay = document.getElementById('global-loading-overlay');
+            overlay.classList.add('hidden');
+            overlay.classList.remove('flex');
+            this.percent = 0;
+            this.render();
+          }, 260);
+        }, 550);
       }
     };
 
