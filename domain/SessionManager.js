@@ -58,6 +58,16 @@ class SessionManager {
    */
   verifySession(token, tenantId) {
     const tokenHash = this.passwordHasher.hash(token, "SESSION_SALT_CONST", 1);
+    const actorCache = CacheService.getScriptCache();
+    const actorCacheKey = "session_actor:" + tokenHash + ":" + tenantId;
+    const cachedActor = actorCache.get(actorCacheKey);
+    if (cachedActor) {
+      try {
+        return JSON.parse(cachedActor);
+      } catch (ignored) {
+        actorCache.remove(actorCacheKey);
+      }
+    }
     const sessionRow = this.sessionRepo.findByTokenHash(tokenHash);
     
     if (!sessionRow) {
@@ -85,13 +95,17 @@ class SessionManager {
     // Fetch RBAC roles and permissions
     const rbac = this.rbacRepo.getUserRolesAndPermissions(session.userId, tenantId);
     
-    return {
+    const actor = {
       userId: session.userId,
       username: userRow.username,
       tenantId: session.tenantId,
       roles: rbac.roles,
       permissions: rbac.permissions
     };
+    // A deliberately short cache removes repeated 6-sheet authentication reads
+    // during page bootstrap while keeping logout/permission changes responsive.
+    actorCache.put(actorCacheKey, JSON.stringify(actor), 20);
+    return actor;
   }
 
   /**
@@ -121,6 +135,7 @@ class SessionManager {
    */
   revokeSession(token, tenantId) {
     const tokenHash = this.passwordHasher.hash(token, "SESSION_SALT_CONST", 1);
+    CacheService.getScriptCache().remove("session_actor:" + tokenHash + ":" + tenantId);
     const sessionRow = this.sessionRepo.findByTokenHash(tokenHash);
     if (sessionRow) {
       const session = new UserSessionEntity(sessionRow);

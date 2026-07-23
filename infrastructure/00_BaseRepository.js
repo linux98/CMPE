@@ -3,6 +3,36 @@
  * Infrastructure Base Repository Adapter
  */
 
+var CMPE_DB_REQUEST_CONTEXT = {
+  spreadsheet: null,
+  sheets: {},
+  headerMaps: {}
+};
+
+function resetCmpeDbRequestContext_() {
+  CMPE_DB_REQUEST_CONTEXT = {
+    spreadsheet: null,
+    sheets: {},
+    headerMaps: {}
+  };
+}
+
+function getCmpeSpreadsheet_() {
+  if (!CMPE_DB_REQUEST_CONTEXT.spreadsheet) {
+    CMPE_DB_REQUEST_CONTEXT.spreadsheet =
+      SpreadsheetApp.openById(CMPE_ENVIRONMENT.getSpreadsheetId());
+  }
+  return CMPE_DB_REQUEST_CONTEXT.spreadsheet;
+}
+
+function getCmpeSheet_(sheetName) {
+  if (!Object.prototype.hasOwnProperty.call(CMPE_DB_REQUEST_CONTEXT.sheets, sheetName)) {
+    CMPE_DB_REQUEST_CONTEXT.sheets[sheetName] =
+      getCmpeSpreadsheet_().getSheetByName(sheetName);
+  }
+  return CMPE_DB_REQUEST_CONTEXT.sheets[sheetName];
+}
+
 class BaseRepository {
   constructor(sheetName) {
     this.sheetName = sheetName;
@@ -18,19 +48,23 @@ class BaseRepository {
    * Helper to open sheet range
    */
   getSheet() {
-    const ssId = CMPE_ENVIRONMENT.getSpreadsheetId();
-    return SpreadsheetApp.openById(ssId).getSheetByName(this.sheetName);
+    return getCmpeSheet_(this.sheetName);
   }
 
   /**
    * Helper to get header index mappings
    */
   getHeaderMap(sheet) {
+    const cacheKey = this.sheetName + ":" + (sheet.getLastColumn() || 1);
+    if (CMPE_DB_REQUEST_CONTEXT.headerMaps[cacheKey]) {
+      return CMPE_DB_REQUEST_CONTEXT.headerMaps[cacheKey];
+    }
     const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn() || 1).getValues()[0];
     const map = {};
     headers.forEach((h, idx) => {
       if (h) map[h] = idx + 1; // 1-indexed column numbers
     });
+    CMPE_DB_REQUEST_CONTEXT.headerMaps[cacheKey] = map;
     return map;
   }
 
@@ -261,8 +295,7 @@ class BaseRepository {
     if (this.sheetName === "audit_logs") return; // Prevent loops
     
     try {
-      const ssId = CMPE_ENVIRONMENT.getSpreadsheetId();
-      const sheet = SpreadsheetApp.openById(ssId).getSheetByName("audit_logs");
+      const sheet = getCmpeSheet_("audit_logs");
       if (!sheet) return;
       
       const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn() || 1).getValues()[0];

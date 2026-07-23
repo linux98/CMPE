@@ -312,6 +312,7 @@ function writePasswordHistoryEntry(userId, password) {
  * Handles all incoming browser client API execution requests.
  */
 function apiDispatcher(requestEnvelope) {
+  resetCmpeDbRequestContext_();
   requestEnvelope = requestEnvelope || {};
   const reqId = requestEnvelope.requestId || CMPE_UTILITIES.generateUuid();
   const clientInfo = requestEnvelope.client || {};
@@ -856,7 +857,11 @@ function apiDispatcher(requestEnvelope) {
           const competitionName = lookup.competitions[registration.competitionId] || "";
           const schoolName = lookup.schools[registration.schoolId] || "";
           const levelName = lookup.levels[config[1]] || "";
-          return Object.assign({}, registration, {
+          return {
+            registrationId: registration.registrationId,
+            registrationNumber: registration.registrationNumber || "",
+            registrationStatus: registration.registrationStatus,
+            rowVersion: registration.rowVersion,
             registrationDisplay: registration.registrationNumber
               ? `ใบสมัครเลขที่ ${registration.registrationNumber}`
               : "ใบสมัครที่ยังไม่ออกเลข",
@@ -865,7 +870,7 @@ function apiDispatcher(requestEnvelope) {
             schoolNameTh: schoolName || "โรงเรียนในสังกัด",
             educationLevelNameTh: levelName || "ระดับมัธยมศึกษา",
             statusLabelTh: statusLabels[registration.registrationStatus] || registration.registrationStatus
-          });
+          };
         });
         return CMPE_UTILITIES.successEnvelope(viewList, reqId);
       }

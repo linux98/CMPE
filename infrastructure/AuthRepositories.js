@@ -38,8 +38,7 @@ class UserRepository extends BaseRepository {
    */
   logFailedLogin(username, ipAddress, deviceId, timestamp) {
     try {
-      const ssId = CMPE_ENVIRONMENT.getSpreadsheetId();
-      const sheet = SpreadsheetApp.openById(ssId).getSheetByName("login_history");
+      const sheet = getCmpeSheet_("login_history");
       if (!sheet) return;
       sheet.appendRow([
         Utilities.getUuid(), // loginHistoryId
@@ -59,8 +58,7 @@ class UserRepository extends BaseRepository {
    */
   logSuccessLogin(username, ipAddress, deviceId, timestamp) {
     try {
-      const ssId = CMPE_ENVIRONMENT.getSpreadsheetId();
-      const sheet = SpreadsheetApp.openById(ssId).getSheetByName("login_history");
+      const sheet = getCmpeSheet_("login_history");
       if (!sheet) return;
       sheet.appendRow([
         Utilities.getUuid(), // loginHistoryId
@@ -80,8 +78,7 @@ class UserRepository extends BaseRepository {
    */
   logSecurityEvent(userId, eventType, details, ipAddress, deviceId) {
     try {
-      const ssId = CMPE_ENVIRONMENT.getSpreadsheetId();
-      const sheet = SpreadsheetApp.openById(ssId).getSheetByName("security_logs");
+      const sheet = getCmpeSheet_("security_logs");
       if (!sheet) return;
       sheet.appendRow([
         Utilities.getUuid(), // securityLogId
@@ -187,8 +184,7 @@ class RbacRepository {
    * Fetches roles and permissions mapped to user
    */
   getUserRolesAndPermissions(userId, tenantId) {
-    const ssId = CMPE_ENVIRONMENT.getSpreadsheetId();
-    const ss = SpreadsheetApp.openById(ssId);
+    const ss = getCmpeSpreadsheet_();
     
     const userRolesSheet = ss.getSheetByName("user_roles");
     const rolePermsSheet = ss.getSheetByName("role_permissions");

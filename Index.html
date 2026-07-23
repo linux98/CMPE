@@ -760,9 +760,11 @@
 
       async loadDashboardStats() {
         try {
-          const schools = await CMPE_API.call('master.schools.list', { query: "" });
-          const venues = await CMPE_API.call('master.venues.list');
-          const categories = await CMPE_API.call('master.categories.list');
+          const [schools, venues, categories] = await Promise.all([
+            CMPE_API.call('master.schools.list', { query: "" }),
+            CMPE_API.call('master.venues.list'),
+            CMPE_API.call('master.categories.list')
+          ]);
           
           document.getElementById('dash-schools-count').textContent = `${schools.length} โรงเรียน`;
           document.getElementById('dash-venues-count').textContent = `${venues.length} แห่ง`;
@@ -1350,7 +1352,13 @@
         const tbody = document.getElementById('registrations-table-body');
         const count = document.getElementById('registrations-result-count');
         if (!tbody) return;
-        if (count) count.textContent = `แสดง ${list.length.toLocaleString('th-TH')} ใบสมัคร`;
+        const pageSize = 25;
+        const totalPages = Math.max(1, Math.ceil(list.length / pageSize));
+        this.registrationCurrentPage = Math.min(this.registrationCurrentPage || 1, totalPages);
+        const startIndex = (this.registrationCurrentPage - 1) * pageSize;
+        const pageItems = list.slice(startIndex, startIndex + pageSize);
+        this.registrationFilteredCache = list;
+        if (count) count.textContent = `แสดง ${list.length.toLocaleString('th-TH')} ใบสมัคร · หน้า ${this.registrationCurrentPage}/${totalPages}`;
         if (!list.length) {
           tbody.innerHTML = `
             <tr><td colspan="5" class="px-6 py-14 text-center">
@@ -1360,7 +1368,7 @@
             </td></tr>`;
           return;
         }
-        tbody.innerHTML = list.map(r => {
+        tbody.innerHTML = pageItems.map(r => {
           const status = this.registrationStatusPresentation(r.registrationStatus);
           return `
             <tr class="border-b border-slate-900/90 align-top transition hover:bg-slate-900/30">
@@ -1394,10 +1402,23 @@
                 </button>
               </td>
             </tr>`;
-        }).join('');
+        }).join('') + (totalPages > 1 ? `
+          <tr><td colspan="5" class="px-6 py-4">
+            <div class="flex items-center justify-between">
+              <button onclick="CMPE_UI.changeRegistrationPage(-1)" ${this.registrationCurrentPage === 1 ? 'disabled' : ''} class="rounded-lg border border-slate-700 px-3 py-2 text-xs text-slate-300 disabled:cursor-not-allowed disabled:opacity-30">ก่อนหน้า</button>
+              <span class="text-xs text-slate-500">หน้า ${this.registrationCurrentPage} จาก ${totalPages}</span>
+              <button onclick="CMPE_UI.changeRegistrationPage(1)" ${this.registrationCurrentPage === totalPages ? 'disabled' : ''} class="rounded-lg border border-slate-700 px-3 py-2 text-xs text-slate-300 disabled:cursor-not-allowed disabled:opacity-30">ถัดไป</button>
+            </div>
+          </td></tr>` : '');
+      },
+
+      changeRegistrationPage(direction) {
+        this.registrationCurrentPage = Math.max(1, (this.registrationCurrentPage || 1) + direction);
+        this.renderRegistrationRows(this.registrationFilteredCache || []);
       },
 
       filterRegistrationRows() {
+        this.registrationCurrentPage = 1;
         const query = (document.getElementById('registration-search')?.value || '').trim().toLowerCase();
         const status = document.getElementById('registration-status-filter')?.value || '';
         const filtered = (this.registrationListCache || []).filter(item => {
@@ -1592,11 +1613,14 @@
 
       async loadWizardData(regId) {
         try {
-          const reg = await CMPE_API.call('registration.get', { registrationId: regId });
+          const [reg, members, coaches] = await Promise.all([
+            CMPE_API.call('registration.get', { registrationId: regId }),
+            CMPE_API.call('registration.members.list', { registrationId: regId }),
+            CMPE_API.call('registration.coaches.list', { registrationId: regId })
+          ]);
           document.getElementById('wizard-reg-num').textContent = reg.registrationNumber;
 
           // Load members
-          const members = await CMPE_API.call('registration.members.list', { registrationId: regId });
           const mWrapper = document.getElementById('members-list-wrapper');
           if (members.length === 0) {
             mWrapper.innerHTML = `<p class="text-xs text-slate-500 text-center py-6">ยังไม่มีข้อมูลนักเรียนลงทะเบียน</p>`;
@@ -1613,7 +1637,6 @@
           }
 
           // Load coaches
-          const coaches = await CMPE_API.call('registration.coaches.list', { registrationId: regId });
           const cWrapper = document.getElementById('coaches-list-wrapper');
           if (coaches.length === 0) {
             cWrapper.innerHTML = `<p class="text-xs text-slate-500 text-center py-6">ยังไม่มีข้อมูลครูลงทะเบียน</p>`;
