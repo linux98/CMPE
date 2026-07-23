@@ -724,7 +724,75 @@ function apiDispatcher(requestEnvelope) {
         const list = requestedSchoolId
           ? regRepo.findBySchool(requestedSchoolId, tenantId)
           : (canReadTenant ? regRepo.findAll(tenantId) : []);
-        return CMPE_UTILITIES.successEnvelope(list, reqId);
+        // Build the presentation model from one spreadsheet connection. This
+        // avoids repeated openById calls while resolving human-readable names.
+        const displaySpreadsheet = SpreadsheetApp.openById(CMPE_ENVIRONMENT.getSpreadsheetId());
+        const readDisplayRows = (sheetName, tenantMode) => {
+          const sheet = displaySpreadsheet.getSheetByName(sheetName);
+          if (!sheet || sheet.getLastRow() <= 1) return [];
+          const values = sheet.getDataRange().getValues();
+          const headers = values[0].map(String);
+          const tenantIndex = headers.indexOf("tenantId");
+          const recordStatusIndex = headers.indexOf("recordStatus");
+          return values.slice(1).filter(row => {
+            if (recordStatusIndex >= 0 && row[recordStatusIndex] === "DELETED") return false;
+            if (tenantIndex < 0 || tenantMode === "all") return true;
+            const rowTenant = String(row[tenantIndex] || "");
+            if (tenantMode === "tenantOrGlobal") {
+              return rowTenant === tenantId || rowTenant === "SYSTEM" || !rowTenant;
+            }
+            return rowTenant === tenantId;
+          }).map(row => headers.reduce((object, header, index) => {
+            if (header) object[header] = row[index];
+            return object;
+          }, {}));
+        };
+        const configs = readDisplayRows("competition_category_configs", "tenant");
+        const categories = readDisplayRows("competition_categories", "tenantOrGlobal");
+        const competitions = readDisplayRows("competitions", "tenant");
+        const schools = readDisplayRows("schools", "tenant");
+        const educationLevels = readDisplayRows("education_levels", "all");
+        const indexBy = (rows, key) => rows.reduce((map, row) => {
+          map[row[key]] = row;
+          return map;
+        }, {});
+        const configById = indexBy(configs, "competitionCategoryConfigId");
+        const categoryById = indexBy(categories, "categoryId");
+        const competitionById = indexBy(competitions, "competitionId");
+        const schoolById = indexBy(schools, "schoolId");
+        const levelById = indexBy(educationLevels, "educationLevelId");
+        const statusLabels = {
+          DRAFT: "ฉบับร่าง",
+          SUBMITTED: "ส่งใบสมัครแล้ว",
+          UNDER_REVIEW: "อยู่ระหว่างตรวจสอบ",
+          REVISION_REQUIRED: "รอแก้ไขข้อมูล",
+          APPROVED: "อนุมัติแล้ว",
+          REJECTED: "ไม่ผ่านการอนุมัติ",
+          WITHDRAWN: "ถอนใบสมัคร",
+          CHECKED_IN: "รายงานตัวแล้ว",
+          COMPETED: "แข่งขันแล้ว",
+          COMPLETED: "ดำเนินการเสร็จสิ้น",
+          ABSENT: "ไม่มารายงานตัว",
+          DISQUALIFIED: "ถูกตัดสิทธิ์"
+        };
+        const viewList = list.map(registration => {
+          const config = configById[registration.competitionCategoryConfigId] || {};
+          const category = categoryById[config.categoryId] || {};
+          const competition = competitionById[registration.competitionId] || {};
+          const school = schoolById[registration.schoolId] || {};
+          const level = levelById[config.educationLevelId] || {};
+          return Object.assign({}, registration, {
+            registrationDisplay: registration.registrationNumber
+              ? `ใบสมัครเลขที่ ${registration.registrationNumber}`
+              : "ใบสมัครที่ยังไม่ออกเลข",
+            activityNameTh: category.nameTh || "กิจกรรมการแข่งขัน",
+            competitionNameTh: competition.nameTh || "การแข่งขันทักษะวิชาการ",
+            schoolNameTh: school.nameTh || "ไม่พบชื่อโรงเรียน",
+            educationLevelNameTh: level.nameTh || "ระดับมัธยมศึกษา",
+            statusLabelTh: statusLabels[registration.registrationStatus] || registration.registrationStatus
+          });
+        });
+        return CMPE_UTILITIES.successEnvelope(viewList, reqId);
       }
       if (action === "registration.get") {
         const reg = regRepo.findById(payload.registrationId, tenantId);

@@ -1296,33 +1296,144 @@
         }
       },
 
+      escapeHtml(value) {
+        return String(value === undefined || value === null ? '' : value)
+          .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+          .replace(/'/g, '&#039;');
+      },
+
+      registrationStatusPresentation(status) {
+        const styles = {
+          DRAFT: { icon: 'edit_note', tone: 'bg-slate-500/10 text-slate-300 border-slate-600/30' },
+          SUBMITTED: { icon: 'send', tone: 'bg-blue-500/10 text-blue-300 border-blue-500/30' },
+          UNDER_REVIEW: { icon: 'manage_search', tone: 'bg-amber-500/10 text-amber-300 border-amber-500/30' },
+          REVISION_REQUIRED: { icon: 'rate_review', tone: 'bg-orange-500/10 text-orange-300 border-orange-500/30' },
+          APPROVED: { icon: 'verified', tone: 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30' },
+          REJECTED: { icon: 'cancel', tone: 'bg-rose-500/10 text-rose-300 border-rose-500/30' },
+          WITHDRAWN: { icon: 'undo', tone: 'bg-slate-500/10 text-slate-400 border-slate-600/30' },
+          CHECKED_IN: { icon: 'how_to_reg', tone: 'bg-cyan-500/10 text-cyan-300 border-cyan-500/30' },
+          COMPETED: { icon: 'sports_score', tone: 'bg-purple-500/10 text-purple-300 border-purple-500/30' },
+          COMPLETED: { icon: 'task_alt', tone: 'bg-indigo-500/10 text-indigo-300 border-indigo-500/30' },
+          ABSENT: { icon: 'person_off', tone: 'bg-slate-500/10 text-slate-400 border-slate-600/30' },
+          DISQUALIFIED: { icon: 'block', tone: 'bg-rose-500/10 text-rose-300 border-rose-500/30' }
+        };
+        return styles[status] || { icon: 'info', tone: 'bg-indigo-500/10 text-indigo-300 border-indigo-500/30' };
+      },
+
+      renderRegistrationRows(list) {
+        const tbody = document.getElementById('registrations-table-body');
+        const count = document.getElementById('registrations-result-count');
+        if (!tbody) return;
+        if (count) count.textContent = `แสดง ${list.length.toLocaleString('th-TH')} ใบสมัคร`;
+        if (!list.length) {
+          tbody.innerHTML = `
+            <tr><td colspan="5" class="px-6 py-14 text-center">
+              <span class="material-icons-round text-4xl text-slate-700">search_off</span>
+              <p class="mt-2 text-sm font-medium text-slate-400">ไม่พบใบสมัครตามเงื่อนไขที่ค้นหา</p>
+              <p class="mt-1 text-xs text-slate-600">ลองเปลี่ยนคำค้นหาหรือตัวกรองสถานะ</p>
+            </td></tr>`;
+          return;
+        }
+        tbody.innerHTML = list.map(r => {
+          const status = this.registrationStatusPresentation(r.registrationStatus);
+          return `
+            <tr class="border-b border-slate-900/90 align-top transition hover:bg-slate-900/30">
+              <td class="px-6 py-5">
+                <p class="font-semibold text-white">${this.escapeHtml(r.registrationDisplay)}</p>
+                <p class="mt-1 font-mono text-[10px] text-slate-500">อ้างอิง ${this.escapeHtml(r.registrationId)}</p>
+                <div class="mt-3 flex items-center gap-1.5 text-xs text-slate-400">
+                  <span class="material-icons-round text-sm text-indigo-400">school</span>
+                  <span>${this.escapeHtml(r.schoolNameTh)}</span>
+                </div>
+              </td>
+              <td class="px-6 py-5">
+                <p class="font-semibold leading-5 text-white">${this.escapeHtml(r.activityNameTh)}</p>
+                <span class="mt-2 inline-flex rounded-lg bg-slate-800/80 px-2 py-1 text-[10px] text-slate-400">
+                  ${this.escapeHtml(r.educationLevelNameTh)}
+                </span>
+              </td>
+              <td class="px-6 py-5">
+                <p class="max-w-xs text-xs leading-5 text-slate-300">${this.escapeHtml(r.competitionNameTh)}</p>
+              </td>
+              <td class="px-6 py-5">
+                <span class="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border px-2.5 py-1.5 text-[10px] font-semibold ${status.tone}">
+                  <span class="material-icons-round text-sm">${status.icon}</span>
+                  ${this.escapeHtml(r.statusLabelTh)}
+                </span>
+              </td>
+              <td class="px-6 py-5 text-right">
+                <button onclick="CMPE_UI.navigateTo('reg-wizard-${this.escapeHtml(r.registrationId)}')" class="inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-3.5 py-2 text-xs font-semibold text-white transition hover:bg-indigo-500">
+                  <span class="material-icons-round text-sm">group</span>
+                  จัดการทีม
+                </button>
+              </td>
+            </tr>`;
+        }).join('');
+      },
+
+      filterRegistrationRows() {
+        const query = (document.getElementById('registration-search')?.value || '').trim().toLowerCase();
+        const status = document.getElementById('registration-status-filter')?.value || '';
+        const filtered = (this.registrationListCache || []).filter(item => {
+          const searchable = [
+            item.registrationNumber, item.registrationDisplay, item.schoolNameTh,
+            item.activityNameTh, item.competitionNameTh, item.statusLabelTh
+          ].join(' ').toLowerCase();
+          return (!query || searchable.includes(query)) &&
+            (!status || item.registrationStatus === status);
+        });
+        this.renderRegistrationRows(filtered);
+      },
+
       async renderRegistrationsSchoolView() {
         const main = document.getElementById('main-content');
         main.innerHTML = `
-          <div class="w-full max-w-4xl space-y-6">
-            <div class="flex items-center justify-between">
+          <div class="w-full max-w-6xl space-y-6">
+            <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <h2 class="text-xl font-bold text-white">ใบสมัครการแข่งขันของโรงเรียน</h2>
-                <p class="text-xs text-slate-400">สร้าง แก้ไขดราฟต์ และติดตามสถานะความสมบูรณ์ใบสมัคร</p>
+                <h2 class="text-xl font-bold text-white">ใบสมัครเข้าร่วมการแข่งขัน</h2>
+                <p class="mt-1 text-xs text-slate-400">ค้นหา ตรวจสอบสถานะ และจัดการข้อมูลทีมด้วยชื่อที่เข้าใจง่าย</p>
               </div>
-              <button onclick="CMPE_UI.openCreateRegistrationModal()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold transition">
+              <button onclick="CMPE_UI.openCreateRegistrationModal()" class="inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-xs font-semibold text-white transition hover:bg-indigo-500">
+                <span class="material-icons-round text-base">add</span>
                 สร้างใบสมัครใหม่
               </button>
             </div>
-            
-            <div class="border border-slate-800 bg-slate-950/40 rounded-3xl overflow-hidden shadow-xl">
-              <table class="w-full text-left text-sm text-slate-300">
-                <thead class="bg-slate-900 text-xs text-slate-400 font-semibold uppercase">
+
+            <div class="grid gap-3 rounded-2xl border border-slate-800 bg-slate-900/30 p-4 sm:grid-cols-[1fr_14rem_auto] sm:items-center">
+              <label class="relative block">
+                <span class="material-icons-round absolute left-3 top-2.5 text-lg text-slate-500">search</span>
+                <input id="registration-search" oninput="CMPE_UI.filterRegistrationRows()" type="search" placeholder="ค้นหาเลขที่ใบสมัคร โรงเรียน หรือชื่อกิจกรรม" class="w-full rounded-xl border border-slate-800 bg-slate-950/60 py-2.5 pl-10 pr-4 text-xs text-white outline-none transition placeholder:text-slate-600 focus:border-indigo-500" />
+              </label>
+              <select id="registration-status-filter" onchange="CMPE_UI.filterRegistrationRows()" class="rounded-xl border border-slate-800 bg-slate-950/60 px-3 py-2.5 text-xs text-slate-300 outline-none focus:border-indigo-500">
+                <option value="">ทุกสถานะ</option>
+                <option value="DRAFT">ฉบับร่าง</option>
+                <option value="SUBMITTED">ส่งใบสมัครแล้ว</option>
+                <option value="UNDER_REVIEW">อยู่ระหว่างตรวจสอบ</option>
+                <option value="REVISION_REQUIRED">รอแก้ไขข้อมูล</option>
+                <option value="APPROVED">อนุมัติแล้ว</option>
+                <option value="REJECTED">ไม่ผ่านการอนุมัติ</option>
+                <option value="CHECKED_IN">รายงานตัวแล้ว</option>
+                <option value="COMPLETED">ดำเนินการเสร็จสิ้น</option>
+              </select>
+              <p id="registrations-result-count" class="whitespace-nowrap text-right text-xs font-medium text-indigo-300">กำลังโหลดข้อมูล</p>
+            </div>
+
+            <div class="overflow-x-auto rounded-3xl border border-slate-800 bg-slate-950/40 shadow-xl">
+              <table class="w-full min-w-[960px] text-left text-sm text-slate-300">
+                <thead class="bg-slate-900/90 text-[11px] font-semibold text-slate-400">
                   <tr>
-                    <th class="px-6 py-4">รหัสใบสมัคร</th>
-                    <th class="px-6 py-4">หมวดหมู่กิจกรรม</th>
+                    <th class="px-6 py-4">ใบสมัครและโรงเรียน</th>
+                    <th class="px-6 py-4">กิจกรรมที่สมัคร</th>
+                    <th class="px-6 py-4">งานแข่งขัน</th>
                     <th class="px-6 py-4">สถานะ</th>
                     <th class="px-6 py-4 text-right">ดำเนินการ</th>
                   </tr>
                 </thead>
                 <tbody id="registrations-table-body">
                   <tr>
-                    <td colspan="4" class="text-center py-8 text-slate-500">กำลังโหลด...</td>
+                    <td colspan="5" class="py-10 text-center text-slate-500">กำลังเตรียมรายการใบสมัคร...</td>
                   </tr>
                 </tbody>
               </table>
@@ -1332,27 +1443,16 @@
 
         try {
           const list = await CMPE_API.call('registration.list', {});
-          const tbody = document.getElementById('registrations-table-body');
+          this.registrationListCache = list;
           if (list.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="4" class="text-center py-8 text-slate-500">ไม่มีประวัติการส่งใบสมัคร</td></tr>`;
+            this.renderRegistrationRows([]);
             return;
           }
-          tbody.innerHTML = list.map(r => `
-            <tr class="border-b border-slate-900 hover:bg-slate-900/20">
-              <td class="px-6 py-4 font-mono text-xs text-indigo-400">${r.registrationNumber}</td>
-              <td class="px-6 py-4 font-medium text-white">${r.competitionCategoryConfigId}</td>
-              <td class="px-6 py-4">
-                <span class="px-2 py-1 rounded-full text-[10px] font-bold bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
-                  ${r.registrationStatus}
-                </span>
-              </td>
-              <td class="px-6 py-4 text-right">
-                <button onclick="CMPE_UI.navigateTo('reg-wizard-${r.registrationId}')" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs transition">จัดการสมาชิก</button>
-              </td>
-            </tr>
-          `).join('');
+          this.renderRegistrationRows(list);
         } catch (e) {
-          this.showToast('ดึงประวัติใบสมัครล้มเหลว', 'error');
+          const tbody = document.getElementById('registrations-table-body');
+          if (tbody) tbody.innerHTML = `<tr><td colspan="5" class="px-6 py-12 text-center text-rose-400">ไม่สามารถโหลดรายการใบสมัครได้ กรุณาลองใหม่อีกครั้ง</td></tr>`;
+          this.showToast(e.message || 'ดึงข้อมูลใบสมัครไม่สำเร็จ', 'error');
         }
       },
 
@@ -1670,11 +1770,14 @@
           
           tbody.innerHTML = submissions.map(r => `
             <tr class="border-b border-slate-900 hover:bg-slate-900/20">
-              <td class="px-6 py-4 font-mono text-xs text-indigo-400">${r.registrationNumber}</td>
-              <td class="px-6 py-4 font-medium text-white">${r.schoolId}</td>
+              <td class="px-6 py-4">
+                <p class="font-semibold text-white">${this.escapeHtml(r.registrationDisplay)}</p>
+                <p class="mt-1 text-[10px] text-slate-500">${this.escapeHtml(r.activityNameTh)}</p>
+              </td>
+              <td class="px-6 py-4 font-medium text-white">${this.escapeHtml(r.schoolNameTh)}</td>
               <td class="px-6 py-4">
                 <span class="px-2 py-1 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20">
-                  ${r.registrationStatus}
+                  ${this.escapeHtml(r.statusLabelTh)}
                 </span>
               </td>
               <td class="px-6 py-4 text-right space-x-2">
