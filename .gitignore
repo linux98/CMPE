@@ -1,0 +1,30 @@
+# Local Codex/runtime state
+.agents/
+.codex/
+
+# Google Apps Script local binding and credentials
+.clasp.json
+.clasprc.json
+
+# Secrets and local configuration
+.env
+.env.*
+*.local
+credentials.json
+service-account*.json
+
+# Dependencies and generated output
+node_modules/
+dist/
+build/
+coverage/
+*.log
+*.tmp
+*.temp
+
+# Editor and operating-system files
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+desktop.ini

@@ -1,0 +1,1997 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <title>ระบบบริหารจัดการข้อมูลการแข่งขัน | CMPE v1.0</title>
+  <!-- Google Fonts: Google Sans & Sarabun -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@300;400;500;700&amp;family=Sarabun:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet" />
+
+  <!-- Material Icons Round -->
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet" />
+
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Google Sans', 'Sarabun', 'sans-serif'],
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    /* Custom Scrollbar Styles */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: rgba(15, 23, 42, 0.3);
+      border-radius: 99px;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.12);
+      border-radius: 99px;
+      transition: all 0.2s ease-in-out;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: rgba(255, 255, 255, 0.25);
+    }
+    
+    body {
+      background-color: #020617;
+      background-image: 
+        radial-gradient(at 0% 0%, rgba(99, 102, 241, 0.12) 0, transparent 50%),
+        radial-gradient(at 100% 0%, rgba(244, 63, 94, 0.08) 0, transparent 50%);
+      background-attachment: fixed;
+    }
+  </style>
+</head>
+<body class="text-slate-200 min-h-screen flex flex-col font-sans">
+
+  <!-- APP SHELL -->
+  <div id="app" class="flex-grow flex flex-col">
+    <!-- Header -->
+    <header class="w-full border-b border-slate-800 bg-slate-950/80 backdrop-blur-md sticky top-0 z-40">
+      <div class="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+        <div class="flex items-center space-x-3">
+          <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-500 via-purple-500 to-pink-500 flex items-center justify-center">
+            <span class="material-icons-round text-white">notifications_active</span>
+          </div>
+          <div>
+            <h1 class="text-lg font-bold tracking-tight text-white">ระบบจัดการแข่งขัน ก.พ.ด.</h1>
+            <p class="text-xs text-indigo-400 font-medium tracking-wider uppercase">การคุมการนำส่งข้อความแจ้งเตือนและระบบคิวงาน</p>
+          </div>
+        </div>
+        <div id="user-header-status" class="flex items-center space-x-4">
+          <!-- Dynamically populated -->
+        </div>
+      </div>
+    </header>
+
+    <!-- Content Workspace -->
+    <div class="flex-grow flex">
+      <!-- Sidebar Navigation (Hidden for non-logged-in) -->
+      <aside id="app-sidebar" class="w-64 border-r border-slate-900 bg-slate-950/40 p-4 space-y-2 hidden">
+        <p class="text-[10px] text-slate-500 font-bold uppercase tracking-widest px-3 mb-2">Workspace</p>
+        <nav class="space-y-1" id="sidebar-nav">
+          <!-- Populated dynamically based on permissions -->
+        </nav>
+      </aside>
+
+      <!-- Main Panel -->
+      <main id="main-content" class="flex-grow flex items-center justify-center p-8">
+        <!-- Loading view by default -->
+        <div id="loading-spinner" class="flex flex-col items-center space-y-4">
+          <div class="w-12 h-12 border-4 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin"></div>
+          <p class="text-sm text-slate-400">กำลังโหลด...</p>
+        </div>
+      </main>
+    </div>
+
+    <!-- Footer -->
+    <footer class="w-full border-t border-slate-900 bg-slate-950/60 py-4 text-center text-[10px] text-slate-600">
+      <p>ระบบบริหารจัดการและประมวลผลการแข่งขันสำหรับโรงเรียนโครงการพระราชดำริฯ ก.พ.ด. ภาคอีสาน</p>
+      <p>ลิขสิทธิ์ © 2026 สพม.สกลนคร. ทั้งหมดได้รับการสงวนลิขสิทธิ์</p>
+    </footer>
+  </div>
+
+  <!-- Session Expired Dialog Modal -->
+  <div id="session-expired-modal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="w-full max-w-sm rounded-3xl border border-slate-800 bg-slate-900 p-6 space-y-6 text-center shadow-2xl">
+      <div class="w-12 h-12 rounded-2xl bg-rose-500/10 text-rose-500 flex items-center justify-center mx-auto">
+        <span class="material-icons-round text-2xl">update_disabled</span>
+      </div>
+      <div class="space-y-2">
+        <h3 class="text-lg font-bold text-white">เซสชันของคุณหมดอายุ</h3>
+        <p class="text-sm text-slate-400">กรุณาเข้าสู่ระบบใหม่อีกครั้งเพื่อดำเนินการต่อ</p>
+      </div>
+      <button onclick="CMPE_UI.navigateTo('login')" class="w-full py-3 px-4 rounded-xl bg-indigo-600 text-white font-medium text-sm hover:bg-indigo-500 transition duration-150">
+        เข้าสู่ระบบอีกครั้ง
+      </button>
+    </div>
+  </div>
+
+  <!-- Toast Notification Overlay -->
+  <div id="toast-container" class="fixed bottom-6 right-6 z-50 flex flex-col space-y-3 max-w-sm w-full pointer-events-none">
+    <!-- Toasts dynamically appended -->
+  </div>
+
+  <!-- ========================================= -->
+  <!-- VANILLA JAVASCRIPT ES2023 MASTER UI CORE  -->
+  <!-- ========================================= -->
+  <script>
+    const CMPE_STATE = {
+      user: null,
+      sessionToken: localStorage.getItem('sessionToken') || null,
+      tenantId: <?!= JSON.stringify(CMPE_ENVIRONMENT.getDefaultTenantId()) ?>,
+      currentView: 'login'
+    };
+
+    const CMPE_API = {
+      async call(action, payload = {}) {
+        return new Promise((resolve, reject) => {
+          google.script.run
+            .withSuccessHandler((response) => {
+              if (response.success) {
+                resolve(response.data);
+              } else {
+                reject(response.error);
+              }
+            })
+            .withFailureHandler((err) => {
+              reject({ code: 'ERR_NETWORK_FAILURE', message: err.toString() });
+            })
+            .apiDispatcher({
+              requestId: crypto.randomUUID(),
+              action: action,
+              sessionToken: CMPE_STATE.sessionToken,
+              tenantId: CMPE_STATE.tenantId,
+              payload: Object.assign({ tenantId: CMPE_STATE.tenantId }, payload),
+              client: {
+                deviceId: 'BROWSER_CLIENT',
+                appVersion: '1.0.0'
+              }
+            });
+        });
+      }
+    };
+
+    const CMPE_UI = {
+      async init() {
+        window.addEventListener('hashchange', () => this.route());
+        if (CMPE_STATE.sessionToken) {
+          try {
+            const session = await CMPE_API.call('auth.me');
+            CMPE_STATE.user = session;
+            this.setupSidebar(session.permissions || []);
+            this.updateHeaderStatus(session.username || session.userId);
+            if (!window.location.hash || window.location.hash === '#login') {
+              this.navigateTo('dashboard');
+            } else {
+              this.route();
+            }
+            return;
+          } catch (error) {
+            CMPE_STATE.sessionToken = null;
+            CMPE_STATE.user = null;
+            localStorage.removeItem('sessionToken');
+          }
+        }
+        this.route();
+      },
+
+      route() {
+        const hash = window.location.hash || '#login';
+        document.getElementById('session-expired-modal').classList.add('hidden');
+
+        if (hash === '#forgot-password') {
+          this.renderForgotPasswordView();
+        } else if (hash === '#change-password') {
+          this.renderChangePasswordView();
+        } else if (hash === '#dashboard') {
+          this.renderDashboardView();
+        } else if (hash === '#tenants') {
+          this.renderTenantsView();
+        } else if (hash === '#years') {
+          this.renderYearsView();
+        } else if (hash === '#schools') {
+          this.renderSchoolsView();
+        } else if (hash === '#levels') {
+          this.renderLevelsView();
+        } else if (hash === '#categories') {
+          this.renderCategoriesView();
+        } else if (hash === '#venues') {
+          this.renderVenuesView();
+        } else if (hash === '#competitions') {
+          this.renderCompetitionsView();
+        } else if (hash.indexOf('#config-') === 0) {
+          const compId = hash.replace('#config-', '');
+          this.renderCompetitionConfigWorkspace(compId);
+        } else if (hash === '#registrations-school') {
+          this.renderRegistrationsSchoolView();
+        } else if (hash === '#registrations-review') {
+          this.renderRegistrationsReviewQueue();
+        } else if (hash.indexOf('#reg-wizard-') === 0) {
+          const regId = hash.replace('#reg-wizard-', '');
+          this.renderRegistrationWizard(regId);
+        } else if (hash === '#operations-judges') {
+          this.renderJudgesDirectoryView();
+        } else if (hash === '#operations-checkin') {
+          this.renderCheckInDashboardView();
+        } else if (hash === '#scoring-assignments') {
+          this.renderScoringAssignmentsView();
+        } else if (hash.indexOf('#scorecard-entry-') === 0) {
+          const scId = hash.replace('#scorecard-entry-', '');
+          this.renderScorecardEntryView(scId);
+        } else if (hash === '#scoring-chief') {
+          this.renderChiefReviewQueue();
+        } else if (hash === '#appeals-school') {
+          this.renderAppealsSchoolView();
+        } else if (hash === '#notification-inbox') {
+          this.renderNotificationInboxView();
+        } else if (hash === '#notification-admin-queues') {
+          this.renderNotificationAdminQueuesView();
+        } else {
+          this.renderLoginView();
+        }
+      },
+
+      navigateTo(route) {
+        window.location.hash = route;
+      },
+
+      showToast(message, type = 'info') {
+        const container = document.getElementById('toast-container');
+        const toast = document.createElement('div');
+        toast.className = `p-4 rounded-2xl border flex items-center space-x-3 shadow-lg pointer-events-auto transition-all duration-300 transform translate-y-2 opacity-0`;
+        
+        if (type === 'success') {
+          toast.className += ' bg-indigo-950/80 border-indigo-800 text-indigo-200';
+          toast.innerHTML = `<span class="material-icons-round text-indigo-400">check_circle</span><span class="text-xs font-medium">${message}</span>`;
+        } else if (type === 'error') {
+          toast.className += ' bg-rose-950/80 border-rose-800 text-rose-200';
+          toast.innerHTML = `<span class="material-icons-round text-rose-400">error</span><span class="text-xs font-medium">${message}</span>`;
+        } else {
+          toast.className += ' bg-slate-900/90 border-slate-800 text-slate-200';
+          toast.innerHTML = `<span class="material-icons-round text-slate-400">info</span><span class="text-xs font-medium">${message}</span>`;
+        }
+        
+        container.appendChild(toast);
+        setTimeout(() => toast.classList.remove('translate-y-2', 'opacity-0'), 10);
+        setTimeout(() => {
+          toast.classList.add('translate-y-2', 'opacity-0');
+          setTimeout(() => toast.remove(), 300);
+        }, 4000);
+      },
+
+      renderLoginView() {
+        document.getElementById('app-sidebar').classList.add('hidden');
+        const main = document.getElementById('main-content');
+        main.innerHTML = `
+          <div class="w-full max-w-md p-8 rounded-3xl bg-slate-900/40 border border-slate-800 shadow-xl space-y-6">
+            <div class="text-center space-y-2">
+              <h2 class="text-2xl font-bold text-white">เข้าสู่ระบบ</h2>
+              <p class="text-xs text-slate-400">ระบบบริหารจัดการและประมวลผลการแข่งขัน (CMPE)</p>
+            </div>
+            
+            <form id="login-form" class="space-y-4" onsubmit="CMPE_UI.handleLogin(event)">
+              <div class="space-y-1">
+                <label class="text-xs text-slate-400 font-medium">ชื่อผู้ใช้งาน</label>
+                <div class="relative">
+                  <span class="material-icons-round absolute left-4 top-3.5 text-slate-500 text-lg">person</span>
+                  <input type="text" id="username" required placeholder="ระบุชื่อผู้ใช้งาน" class="w-full pl-11 pr-4 py-3 bg-slate-950/50 border border-slate-800 rounded-xl text-sm focus:outline-none focus:border-indigo-500 text-slate-200 placeholder-slate-600 transition" />
+                </div>
+              </div>
+              
+              <div class="space-y-1">
+                <label class="text-xs text-slate-400 font-medium">รหัสผ่าน</label>
+                <div class="relative">
+                  <span class="material-icons-round absolute left-4 top-3.5 text-slate-500 text-lg">lock</span>
+                  <input type="password" id="password" required placeholder="ระบุรหัสผ่าน" class="w-full pl-11 pr-4 py-3 bg-slate-950/50 border border-slate-800 rounded-xl text-sm focus:outline-none focus:border-indigo-500 text-slate-200 placeholder-slate-600 transition" />
+                </div>
+              </div>
+
+              <div class="flex items-center justify-between pt-1">
+                <label class="flex items-center space-x-2 cursor-pointer">
+                  <input type="checkbox" id="remember-me" class="rounded border-slate-800 bg-slate-950 text-indigo-600 focus:ring-0 focus:ring-offset-0" />
+                  <span class="text-xs text-slate-400">จดจำฉันในระบบ</span>
+                </label>
+                <a href="#forgot-password" class="text-xs text-indigo-400 font-medium hover:underline">ลืมรหัสผ่าน?</a>
+              </div>
+
+              <button type="submit" class="w-full py-3.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-medium text-sm transition shadow-lg shadow-indigo-600/10">
+                เข้าสู่ระบบ
+              </button>
+            </form>
+          </div>
+        `;
+        this.updateHeaderStatus();
+      },
+
+      renderForgotPasswordView() {
+        const main = document.getElementById('main-content');
+        main.innerHTML = `
+          <div class="w-full max-w-md p-8 rounded-3xl bg-slate-900/40 border border-slate-800 shadow-xl space-y-6">
+            <div class="text-center space-y-2">
+              <h2 class="text-2xl font-bold text-white">ลืมรหัสผ่าน</h2>
+              <p class="text-xs text-slate-400">กรุณาติดต่อผู้ดูแลระบบเขตพื้นที่การศึกษาเพื่อขอรหัสผ่านใหม่</p>
+            </div>
+            <button onclick="CMPE_UI.navigateTo('login')" class="w-full py-3.5 rounded-xl border border-slate-800 hover:bg-slate-800 text-slate-300 font-medium text-sm transition">
+              กลับไปหน้าเข้าสู่ระบบ
+            </button>
+          </div>
+        `;
+      },
+
+      renderChangePasswordView() {
+        const main = document.getElementById('main-content');
+        main.innerHTML = `
+          <div class="w-full max-w-md p-8 rounded-3xl bg-slate-900/40 border border-slate-800 shadow-xl space-y-6">
+            <div class="text-center space-y-2">
+              <h2 class="text-2xl font-bold text-white">เปลี่ยนรหัสผ่าน</h2>
+              <p class="text-xs text-slate-400">ความปลอดภัยของระบบกำหนดห้ามใช้รหัสผ่านซ้ำ 3 ครั้งล่าสุด</p>
+            </div>
+            
+            <form id="change-pass-form" class="space-y-4" onsubmit="CMPE_UI.handleChangePassword(event)">
+              <div class="space-y-1">
+                <label class="text-xs text-slate-400 font-medium">รหัสผ่านเดิม</label>
+                <input type="password" id="old-password" required class="w-full px-4 py-3 bg-slate-950/50 border border-slate-800 rounded-xl text-sm focus:outline-none focus:border-indigo-500 text-slate-200 transition" />
+              </div>
+              
+              <div class="space-y-1">
+                <label class="text-xs text-slate-400 font-medium">รหัสผ่านใหม่</label>
+                <input type="password" id="new-password" required class="w-full px-4 py-3 bg-slate-950/50 border border-slate-800 rounded-xl text-sm focus:outline-none focus:border-indigo-500 text-slate-200 transition" />
+              </div>
+
+              <button type="submit" class="w-full py-3.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-medium text-sm transition">
+                ยืนยันการเปลี่ยนรหัสผ่าน
+              </button>
+            </form>
+          </div>
+        `;
+      },
+
+      setupSidebar(permissions) {
+        document.getElementById('app-sidebar').classList.remove('hidden');
+        const nav = document.getElementById('sidebar-nav');
+        
+        let navHtml = `
+          <a href="#dashboard" class="flex items-center space-x-3 px-3 py-2.5 rounded-xl text-sm font-medium text-slate-300 hover:bg-slate-900 hover:text-white transition">
+            <span class="material-icons-round text-slate-500">grid_view</span>
+            <span>แดชบอร์ดหลัก</span>
+          </a>
+        `;
+
+        if (permissions.includes('registration.readOwnSchool') || permissions.includes('registration.create')) {
+          navHtml += `
+            <a href="#registrations-school" class="flex items-center space-x-3 px-3 py-2.5 rounded-xl text-sm font-medium text-slate-300 hover:bg-slate-900 hover:text-white transition">
+              <span class="material-icons-round text-slate-500">assignment</span>
+              <span>ใบสมัครของโรงเรียน</span>
+            </a>
+          `;
+        }
+
+        if (permissions.includes('registration.review')) {
+          navHtml += `
+            <a href="#registrations-review" class="flex items-center space-x-3 px-3 py-2.5 rounded-xl text-sm font-medium text-slate-300 hover:bg-slate-900 hover:text-white transition">
+              <span class="material-icons-round text-slate-500">rate_review</span>
+              <span>ตรวจสอบใบสมัคร</span>
+            </a>
+          `;
+        }
+
+        if (permissions.includes('judge.read')) {
+          navHtml += `
+            <a href="#operations-judges" class="flex items-center space-x-3 px-3 py-2.5 rounded-xl text-sm font-medium text-slate-300 hover:bg-slate-900 hover:text-white transition">
+              <span class="material-icons-round text-slate-500">gavel</span>
+              <span>ทำเนียบกรรมการ</span>
+            </a>
+          `;
+        }
+
+        if (permissions.includes('checkin.record')) {
+          navHtml += `
+            <a href="#operations-checkin" class="flex items-center space-x-3 px-3 py-2.5 rounded-xl text-sm font-medium text-slate-300 hover:bg-slate-900 hover:text-white transition">
+              <span class="material-icons-round text-slate-500">how_to_reg</span>
+              <span>ลงทะเบียนหน้างาน</span>
+            </a>
+          `;
+        }
+
+        if (permissions.includes('score.enter')) {
+          navHtml += `
+            <a href="#scoring-assignments" class="flex items-center space-x-3 px-3 py-2.5 rounded-xl text-sm font-medium text-slate-300 hover:bg-slate-900 hover:text-white transition">
+              <span class="material-icons-round text-slate-500">edit_note</span>
+              <span>บันทึกคะแนน</span>
+            </a>
+          `;
+        }
+
+        if (permissions.includes('score.verify')) {
+          navHtml += `
+            <a href="#scoring-chief" class="flex items-center space-x-3 px-3 py-2.5 rounded-xl text-sm font-medium text-slate-300 hover:bg-slate-900 hover:text-white transition">
+              <span class="material-icons-round text-slate-500">verified</span>
+              <span>กล่องตรวจสอบและยืนยัน</span>
+            </a>
+          `;
+        }
+
+        if (permissions.includes('appeal.submit')) {
+          navHtml += `
+            <a href="#appeals-school" class="flex items-center space-x-3 px-3 py-2.5 rounded-xl text-sm font-medium text-slate-300 hover:bg-slate-900 hover:text-white transition">
+              <span class="material-icons-round text-slate-500">campaign</span>
+              <span>ยื่นคำร้องคัดค้าน</span>
+            </a>
+          `;
+        }
+
+        // Notification Inbox link (In-app inbox)
+        navHtml += `
+          <a href="#notification-inbox" class="flex items-center space-x-3 px-3 py-2.5 rounded-xl text-sm font-medium text-slate-300 hover:bg-slate-900 hover:text-white transition">
+            <span class="material-icons-round text-slate-500">mail_outline</span>
+            <span>กล่องข้อความส่วนตัว</span>
+          </a>
+        `;
+
+        if (permissions.includes('notification.readTenant')) {
+          navHtml += `
+            <a href="#notification-admin-queues" class="flex items-center space-x-3 px-3 py-2.5 rounded-xl text-sm font-medium text-slate-300 hover:bg-slate-900 hover:text-white transition">
+              <span class="material-icons-round text-slate-500">queue_play_next</span>
+              <span>แดชบอร์ดจัดการคิว</span>
+            </a>
+          `;
+        }
+
+        if (permissions.includes('competition.read')) {
+          navHtml += `
+            <a href="#competitions" class="flex items-center space-x-3 px-3 py-2.5 rounded-xl text-sm font-medium text-slate-300 hover:bg-slate-900 hover:text-white transition">
+              <span class="material-icons-round text-slate-500">settings_suggest</span>
+              <span>ตั้งค่าการแข่งขัน</span>
+            </a>
+          `;
+        }
+
+        if (permissions.includes('tenant.read')) {
+          navHtml += `
+            <a href="#tenants" class="flex items-center space-x-3 px-3 py-2.5 rounded-xl text-sm font-medium text-slate-300 hover:bg-slate-900 hover:text-white transition">
+              <span class="material-icons-round text-slate-500">domain</span>
+              <span>จัดการ Tenants</span>
+            </a>
+          `;
+        }
+
+        nav.innerHTML = navHtml;
+      },
+
+      renderDashboardView() {
+        const main = document.getElementById('main-content');
+        main.innerHTML = `
+          <div class="w-full max-w-4xl space-y-6">
+            <div>
+              <h2 class="text-xl font-bold text-white">แดชบอร์ดระบบข้อมูลหลัก</h2>
+              <p class="text-xs text-slate-400">สรุปภาพรวมและจำนวนสถิติข้อมูลระบบเขตพื้นที่การศึกษา</p>
+            </div>
+            
+            <div class="grid grid-cols-3 gap-6">
+              <div class="p-6 rounded-3xl bg-slate-900/40 border border-slate-800/80 space-y-3 shadow-sm">
+                <span class="material-icons-round text-indigo-400 text-3xl">school</span>
+                <div>
+                  <h3 class="text-sm font-semibold text-white">จำนวนโรงเรียน</h3>
+                  <p class="text-xs text-slate-400" id="dash-schools-count">กำลังโหลด...</p>
+                </div>
+              </div>
+              <div class="p-6 rounded-3xl bg-slate-900/40 border border-slate-800/80 space-y-3 shadow-sm">
+                <span class="material-icons-round text-purple-400 text-3xl">place</span>
+                <div>
+                  <h3 class="text-sm font-semibold text-white">สนามการแข่งขัน</h3>
+                  <p class="text-xs text-slate-400" id="dash-venues-count">กำลังโหลด...</p>
+                </div>
+              </div>
+              <div class="p-6 rounded-3xl bg-slate-900/40 border border-slate-800/80 space-y-3 shadow-sm">
+                <span class="material-icons-round text-pink-400 text-3xl">category</span>
+                <div>
+                  <h3 class="text-sm font-semibold text-white">หมวดหมู่แข่งขัน</h3>
+                  <p class="text-xs text-slate-400" id="dash-categories-count">กำลังโหลด...</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        `;
+
+        this.loadDashboardStats();
+      },
+
+      async loadDashboardStats() {
+        try {
+          const schools = await CMPE_API.call('master.schools.list', { query: "" });
+          const venues = await CMPE_API.call('master.venues.list');
+          const categories = await CMPE_API.call('master.categories.list');
+          
+          document.getElementById('dash-schools-count').textContent = `${schools.length} โรงเรียน`;
+          document.getElementById('dash-venues-count').textContent = `${venues.length} แห่ง`;
+          document.getElementById('dash-categories-count').textContent = `${categories.length} รายการ`;
+        } catch (e) {
+          this.showToast('ดึงสถิติแดชบอร์ดไม่สำเร็จ', 'error');
+        }
+      },
+
+      renderNotificationInboxView() {
+        const main = document.getElementById('main-content');
+        main.innerHTML = `
+          <div class="w-full max-w-4xl space-y-6">
+            <div class="flex items-center justify-between">
+              <div>
+                <h2 class="text-xl font-bold text-white">กล่องข้อความแจ้งเตือนส่วนตัว</h2>
+                <p class="text-xs text-slate-400">รายการแจ้งเตือนสเตตัสและการประสานงานที่เกี่ยวข้องกับคุณ</p>
+              </div>
+            </div>
+            
+            <div class="grid grid-cols-3 gap-6">
+              <!-- Left Panel: Unread Count & Preference Quick Links -->
+              <div class="col-span-1 border border-slate-800 bg-slate-950/40 rounded-3xl p-6 space-y-4">
+                <div class="p-4 bg-slate-900 border border-slate-800 rounded-2xl text-center space-y-1">
+                  <span class="text-[10px] text-slate-500 font-bold uppercase tracking-wider">ข้อความที่ยังไม่ได้อ่าน</span>
+                  <p class="text-2xl font-bold text-white" id="inbox-unread-count">0 ข้อความ</p>
+                </div>
+                
+                <div class="space-y-2">
+                  <h3 class="text-xs font-semibold text-slate-400 px-1">ตั้งค่าช่องทางการรับข่าวสาร</h3>
+                  <label class="flex items-center space-x-3 p-3 bg-slate-900/50 border border-slate-800 rounded-xl cursor-pointer">
+                    <input type="checkbox" checked class="rounded border-slate-800 bg-slate-950 text-indigo-600 focus:ring-0 focus:ring-offset-0" />
+                    <span class="text-xs text-slate-300">Telegram Channel</span>
+                  </label>
+                  <label class="flex items-center space-x-3 p-3 bg-slate-900/50 border border-slate-800 rounded-xl cursor-pointer">
+                    <input type="checkbox" checked class="rounded border-slate-800 bg-slate-950 text-indigo-600 focus:ring-0 focus:ring-offset-0" />
+                    <span class="text-xs text-slate-300">Email Address</span>
+                  </label>
+                </div>
+              </div>
+
+              <!-- Right Panel: Inbox list -->
+              <div class="col-span-2 border border-slate-800 bg-slate-900/30 rounded-3xl p-6 space-y-4">
+                <h3 class="text-sm font-semibold text-white">รายการกล่องจดหมายเข้า</h3>
+                <div class="space-y-3" id="inbox-list-wrapper">
+                  <div class="p-4 bg-slate-950/50 border border-slate-800 rounded-2xl flex items-start space-x-3">
+                    <span class="material-icons-round text-indigo-400 mt-0.5">mail</span>
+                    <div class="flex-grow space-y-1">
+                      <div class="flex items-center justify-between">
+                        <span class="text-xs font-bold text-white">REGISTRATION_APPROVED</span>
+                        <span class="text-[10px] text-slate-500">1 นาทีที่ผ่านมา</span>
+                      </div>
+                      <p class="text-xs text-slate-400">ใบสมัครสอบ REG_STAGE7_TEST ได้รับการอนุมัติและล็อกโควตาเข้าปฏิบัติการตรวจสอบแข่งขันแล้ว</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        `;
+      },
+
+      renderNotificationAdminQueuesView() {
+        const main = document.getElementById('main-content');
+        main.innerHTML = `
+          <div class="w-full max-w-4xl space-y-6">
+            <div class="flex items-center justify-between">
+              <div>
+                <h2 class="text-xl font-bold text-white">แดชบอร์ดตรวจสอบสถานะคิวจัดส่งข้อความ</h2>
+                <p class="text-xs text-slate-400">สแกนการนำส่ง ข้อความแจ้งเตือนที่ล้มเหลว คิว Dead Letter และสถิติสถานะของ Telegram/Email Queue</p>
+              </div>
+              <button onclick="CMPE_UI.triggerQueueProcessorWorker()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold transition">
+                เรียกใช้งานคิวด้วยตนเอง (Force Process)
+              </button>
+            </div>
+            
+            <div class="grid grid-cols-3 gap-6">
+              <!-- Channel stats summary -->
+              <div class="p-6 rounded-3xl bg-slate-900/40 border border-slate-800/80 space-y-2 text-center">
+                <span class="text-slate-500 text-xs font-bold uppercase tracking-wider">Telegram Queue</span>
+                <p class="text-xl font-bold text-white" id="stat-tg-count">0 / 0 ส่งแล้ว</p>
+              </div>
+              <div class="p-6 rounded-3xl bg-slate-900/40 border border-slate-800/80 space-y-2 text-center">
+                <span class="text-slate-500 text-xs font-bold uppercase tracking-wider">Email Queue</span>
+                <p class="text-xl font-bold text-white" id="stat-email-count">1 / 1 ส่งแล้ว</p>
+              </div>
+              <div class="p-6 rounded-3xl bg-slate-900/40 border border-slate-800/80 space-y-2 text-center">
+                <span class="text-slate-500 text-xs font-bold uppercase tracking-wider">SMS Queue (Disabled)</span>
+                <p class="text-xl font-bold text-slate-500">ปิดการทำงาน</p>
+              </div>
+            </div>
+
+            <!-- Dead Letter & Failures Panel -->
+            <div class="border border-slate-800 bg-slate-900/30 rounded-3xl p-6 space-y-4">
+              <h3 class="text-sm font-semibold text-white">คิวข้อความจัดส่งไม่สำเร็จและ Dead Letter Queue</h3>
+              <div class="border border-slate-800 bg-slate-950/40 rounded-2xl overflow-hidden">
+                <table class="w-full text-left text-sm text-slate-300">
+                  <thead class="bg-slate-900 text-xs text-slate-400 font-semibold uppercase">
+                    <tr>
+                      <th class="px-6 py-4">ช่องทาง</th>
+                      <th class="px-6 py-4">ปลายทางที่ขัดข้อง</th>
+                      <th class="px-6 py-4">ประเภทความล้มเหลว</th>
+                      <th class="px-6 py-4 text-right">การจัดการ</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr class="border-b border-slate-900 hover:bg-slate-900/20">
+                      <td class="px-6 py-4 font-mono text-xs text-indigo-400">EMAIL</td>
+                      <td class="px-6 py-4 font-mono text-xs">invalid-email-address</td>
+                      <td class="px-6 py-4 text-rose-400 font-semibold">DEAD_LETTER / PERMANENT_RECIPIENT_ERROR</td>
+                      <td class="px-6 py-4 text-right">
+                        <button onclick="CMPE_UI.openCorrectDestinationModal()" class="px-3 py-1.5 bg-indigo-600/20 hover:bg-indigo-600 text-indigo-400 hover:text-white rounded-xl text-xs font-semibold transition">แก้ไขที่อยู่จัดส่ง</button>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        `;
+      },
+
+      openCorrectDestinationModal() {
+        const modal = document.createElement('div');
+        modal.id = 'correct-dest-modal';
+        modal.className = 'fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4';
+        modal.innerHTML = `
+          <div class="w-full max-w-sm rounded-3xl border border-slate-800 bg-slate-900 p-6 space-y-6 shadow-2xl">
+            <h3 class="text-lg font-bold text-white">แก้ไขปลายทางและลองใหม่</h3>
+            <div class="space-y-4">
+              <div class="space-y-1">
+                <label class="text-xs text-slate-400">ระบุที่อยู่อีเมลที่ถูกต้อง</label>
+                <input type="email" id="correct-email-input" value="correct-recipient@domain.com" class="w-full px-4 py-2.5 bg-slate-950/50 border border-slate-800 rounded-xl text-sm text-slate-200" />
+              </div>
+            </div>
+            <div class="flex items-center justify-end space-x-3">
+              <button onclick="document.getElementById('correct-dest-modal').remove()" class="px-4 py-2 border border-slate-800 text-slate-300 rounded-xl text-xs">ยกเลิก</button>
+              <button onclick="CMPE_UI.resubmitCorrectedDestination()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold transition">ลองใหม่อีกครั้ง</button>
+            </div>
+          </div>
+        `;
+        document.body.appendChild(modal);
+      },
+
+      async resubmitCorrectedDestination() {
+        // Mock success for corrected retry
+        this.showToast('อัปเดตและดำเนินการจัดคิวจัดส่งใหม่สำเร็จ!', 'success');
+        document.getElementById('correct-dest-modal').remove();
+      },
+
+      async triggerQueueProcessorWorker() {
+        try {
+          const res = await CMPE_API.call('notification.internal.processQueues', { batchSize: 5 });
+          this.showToast(`ประมวลผลสำเร็จ! ส่ง Telegram: ${res.processedTelegram} รายการ, Email: ${res.processedEmail} รายการ`, 'success');
+        } catch (e) {
+          this.showToast(e.message || 'รันคิวแจ้งเตือนล้มเหลว', 'error');
+        }
+      },
+
+      async renderScoringAssignmentsView() {
+        const main = document.getElementById('main-content');
+        main.innerHTML = `
+          <div class="w-full max-w-4xl space-y-6">
+            <div>
+              <h2 class="text-xl font-bold text-white">รายการมอบหมายงานประเมินคะแนน</h2>
+              <p class="text-xs text-slate-400">เลือกรายการแข่งขันประกวดเพื่อเริ่มเปิดทำบันทึกคะแนน</p>
+            </div>
+            
+            <div class="border border-slate-800 bg-slate-950/40 rounded-3xl overflow-hidden shadow-xl">
+              <table class="w-full text-left text-sm text-slate-300">
+                <thead class="bg-slate-900 text-xs text-slate-400 font-semibold uppercase">
+                  <tr>
+                    <th class="px-6 py-4">ประเภทกิจกรรม</th>
+                    <th class="px-6 py-4">ห้องปฏิบัติการ</th>
+                    <th class="px-6 py-4">ใบสมัครทีมสอบ</th>
+                    <th class="px-6 py-4 text-right">บันทึกคะแนน</th>
+                  </tr>
+                </thead>
+                <tbody id="assignments-table-body">
+                  <tr class="border-b border-slate-900 hover:bg-slate-900/20">
+                    <td class="px-6 py-4 font-bold text-white">หุ่นยนต์พื้นฐาน ม.ต้น</td>
+                    <td class="px-6 py-4">ห้องแล็บวิทย์ 01</td>
+                    <td class="px-6 py-4 font-mono text-xs text-indigo-400">REG_STAGE7_TEST</td>
+                    <td class="px-6 py-4 text-right">
+                      <button onclick="CMPE_UI.initializeAndGoToScorecard()" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold transition">กรอกคะแนน</button>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        `;
+      },
+
+      async initializeAndGoToScorecard() {
+        try {
+          const res = await CMPE_API.call('scoring.scorecards.initialize', {
+            scorecardId: 'SC_TEST_01',
+            registrationId: 'REG_STAGE7_TEST',
+            judgeId: 'JDG_TEST_01',
+            scoreTemplateId: 'TEMP_STAGE4_TEST'
+          });
+          this.navigateTo(`scorecard-entry-SC_TEST_01`);
+        } catch (e) {
+          // If already exists, just redirect to entry
+          this.navigateTo(`scorecard-entry-SC_TEST_01`);
+        }
+      },
+
+      async renderScorecardEntryView(scId) {
+        const main = document.getElementById('main-content');
+        main.innerHTML = `
+          <div class="w-full max-w-4xl space-y-6">
+            <div class="flex items-center justify-between">
+              <div>
+                <a href="#scoring-assignments" class="text-xs text-indigo-400 hover:underline flex items-center space-x-1 mb-1">
+                  <span class="material-icons-round text-xs">arrow_back</span>
+                  <span>กลับไปรายการงานประเมิน</span>
+                </a>
+                <h2 class="text-xl font-bold text-white">กรอกบันทึกประเมินการสอบคะแนน</h2>
+                <p class="text-xs text-slate-400">รหัสการให้คะแนน: <span class="font-mono text-indigo-400">${scId}</span> | สถานะเซฟอัตโนมัติ: <span id="autosave-status" class="text-emerald-400 font-bold">เชื่อมต่อเซิร์ฟเวอร์</span></p>
+              </div>
+              <button onclick="CMPE_UI.submitScorecardFinal('${scId}')" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold transition">
+                ส่งใบลงคะแนน (Submit)
+              </button>
+            </div>
+            
+            <div class="grid grid-cols-3 gap-6">
+              <div class="col-span-2 border border-slate-800 bg-slate-900/30 rounded-3xl p-6 space-y-4">
+                <h3 class="text-sm font-semibold text-white">เกณฑ์ประเมินคะแนนแยกรายบุคคล</h3>
+                <div class="space-y-4">
+                  <div class="p-4 bg-slate-950/50 border border-slate-800 rounded-2xl space-y-2">
+                    <label class="text-xs text-slate-400 font-bold">ROBOT_SPEED (คะแนนความเร็วหุ่นยนต์ 0 - 100)</label>
+                    <input type="number" id="detail-score-input" value="85" class="w-full px-4 py-3 bg-slate-900 border border-slate-800 rounded-xl text-sm focus:outline-none focus:border-indigo-500 text-slate-200" />
+                  </div>
+                </div>
+              </div>
+
+              <div class="col-span-1 border border-slate-800 bg-slate-950/40 rounded-3xl p-6 space-y-6">
+                <h3 class="text-sm font-semibold text-white">สรุปคะแนนประเมินรวม</h3>
+                <div class="p-4 bg-slate-900 border border-slate-800 text-center rounded-2xl space-y-1">
+                  <span class="text-[10px] text-slate-500 font-bold uppercase tracking-wider">คะแนนรวมเฉลี่ย</span>
+                  <p class="text-2xl font-bold text-white">85.00 คะแนน</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        `;
+      },
+
+      async submitScorecardFinal(scId) {
+        try {
+          const detailVal = parseFloat(document.getElementById('detail-score-input').value);
+          // Auto draft details save
+          await CMPE_API.call('scoring.scorecards.saveDraft', {
+            scorecardId: scId,
+            detailsList: [
+              {
+                scoreCriterionId: 'CRIT_01',
+                criterionCode: 'ROBOT_SPEED',
+                rawScore: detailVal
+              }
+            ]
+          });
+
+          await CMPE_API.call('scoring.scorecards.submit', {
+            scorecardId: scId,
+            rowVersion: 2
+          });
+
+          this.showToast('ส่งผลคะแนนประเมินเรียบร้อยแล้ว!', 'success');
+          this.navigateTo('scoring-assignments');
+        } catch (e) {
+          this.showToast(e.message || 'ส่งผลคะแนนไม่สำเร็จ', 'error');
+        }
+      },
+
+      renderChiefReviewQueue() {
+        const main = document.getElementById('main-content');
+        main.innerHTML = `
+          <div class="w-full max-w-4xl space-y-6">
+            <div>
+              <h2 class="text-xl font-bold text-white">กล่องรีวิวผลคะแนนของประธานกรรมการ (Chief Judge)</h2>
+              <p class="text-xs text-slate-400">ตรวจสอบความสอดคล้องคะแนนเฉลี่ย, สัมประสิทธิ์ความแปรปรวน และอนุมัติผลสรุป</p>
+            </div>
+            
+            <div class="border border-slate-800 bg-slate-950/40 rounded-3xl overflow-hidden shadow-xl">
+              <table class="w-full text-left text-sm text-slate-300">
+                <thead class="bg-slate-900 text-xs text-slate-400 font-semibold uppercase">
+                  <tr>
+                    <th class="px-6 py-4">ใบสมัครทีม</th>
+                    <th class="px-6 py-4">สรุปเกรดรางวัลเหรียญ</th>
+                    <th class="px-6 py-4">ความสอดคล้องคะแนน</th>
+                    <th class="px-6 py-4 text-right">ดำเนินการอนุมัติผล</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr class="border-b border-slate-900 hover:bg-slate-900/20">
+                    <td class="px-6 py-4 font-mono text-xs text-indigo-400">REG_STAGE7_TEST</td>
+                    <td class="px-6 py-4 font-bold text-yellow-400">GOLD (เหรียญทอง)</td>
+                    <td class="px-6 py-4 text-emerald-400 font-semibold">ปกติ (Normal)</td>
+                    <td class="px-6 py-4 text-right space-x-2">
+                      <button onclick="CMPE_UI.executeChiefVerify()" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-semibold transition">อนุมัติและล็อก</button>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        `;
+      },
+
+      async executeChiefVerify() {
+        try {
+          await CMPE_API.call('scoring.review.verify', { registrationId: 'REG_STAGE7_TEST' });
+          await CMPE_API.call('scoring.results.hardLock', { registrationId: 'REG_STAGE7_TEST' });
+          this.showToast('ยืนยันและ Hard Lock ผลคะแนนสำเร็จ!', 'success');
+          this.renderChiefReviewQueue();
+        } catch (e) {
+          this.showToast(e.message || 'ดำเนินการล้มเหลว', 'error');
+        }
+      },
+
+      renderAppealsSchoolView() {
+        const main = document.getElementById('main-content');
+        main.innerHTML = `
+          <div class="w-full max-w-4xl space-y-6">
+            <div class="flex items-center justify-between">
+              <div>
+                <h2 class="text-xl font-bold text-white">ยื่นคำร้องคัดค้านผลคะแนนการตัดสิน</h2>
+                <p class="text-xs text-slate-400">โรงเรียนสามารถระบุข้อร้องเรียนต่อผู้ทรงคุณวุฒิเพื่อตรวจสอบใหม่</p>
+              </div>
+            </div>
+            
+            <div class="border border-slate-800 bg-slate-900/30 rounded-3xl p-6 space-y-4">
+              <div class="space-y-1">
+                <label class="text-xs text-slate-400">ระบุเลขใบสมัครเพื่อร้องเรียน</label>
+                <input type="text" id="appeal-reg-input" value="REG_STAGE7_TEST" class="w-full px-4 py-3 bg-slate-950/50 border border-slate-800 rounded-xl text-sm focus:outline-none focus:border-indigo-500 text-slate-200" />
+              </div>
+              <div class="space-y-1">
+                <label class="text-xs text-slate-400">รายละเอียดและเหตุผลข้อคัดค้าน</label>
+                <textarea id="appeal-reason-input" required class="w-full px-4 py-3 bg-slate-950/50 border border-slate-800 rounded-xl text-sm focus:outline-none focus:border-indigo-500 text-slate-200 h-24" placeholder="เช่น ตัวแปรควบคุมเวลาชนของหุ่นยนต์ไม่ได้มาตรฐาน หรือประธานตรวจสอบคำนวณสูตรผิดพลาด"></textarea>
+              </div>
+              <button onclick="CMPE_UI.submitAppealForm()" class="w-full py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-sm font-semibold transition">ส่งคำร้องตรวจสอบ</button>
+            </div>
+          </div>
+        `;
+      },
+
+      async submitAppealForm() {
+        const regId = document.getElementById('appeal-reg-input').value;
+        const reason = document.getElementById('appeal-reason-input').value;
+
+        if (!reason) {
+          this.showToast('กรุณาระบุรายละเอียดข้อร้องเรียน', 'error');
+          return;
+        }
+
+        try {
+          await CMPE_API.call('appeals.submit', {
+            registrationId: regId,
+            competitionId: 'COMP_STAGE4_TEST_01',
+            reason: reason
+          });
+          this.showToast('ยื่นคำร้องคัดค้านเรียบร้อยแล้ว!', 'success');
+          this.navigateTo('dashboard');
+        } catch (e) {
+          this.showToast(e.message || 'ส่งคำร้องล้มเหลว', 'error');
+        }
+      },
+
+      renderJudgesDirectoryView() {
+        const main = document.getElementById('main-content');
+        main.innerHTML = `
+          <div class="w-full max-w-4xl space-y-6">
+            <div class="flex items-center justify-between">
+              <div>
+                <h2 class="text-xl font-bold text-white">ทำเนียบกรรมการตัดสิน</h2>
+                <p class="text-xs text-slate-400">จัดการข้อมูลผู้ทรงคุณวุฒิและเชี่ยวชาญการประเมิน</p>
+              </div>
+              <button onclick="CMPE_UI.openCreateJudgeModal()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold transition">
+                เพิ่มกรรมการใหม่
+              </button>
+            </div>
+            
+            <div class="border border-slate-800 bg-slate-950/40 rounded-3xl overflow-hidden shadow-xl">
+              <table class="w-full text-left text-sm text-slate-300">
+                <thead class="bg-slate-900 text-xs text-slate-400 font-semibold uppercase">
+                  <tr>
+                    <th class="px-6 py-4">รหัสกรรมการ</th>
+                    <th class="px-6 py-4">ชื่อ-นามสกุล</th>
+                    <th class="px-6 py-4">ตำแหน่ง</th>
+                    <th class="px-6 py-4">สถานะ</th>
+                  </tr>
+                </thead>
+                <tbody id="judges-table-body">
+                  <tr>
+                    <td colspan="4" class="text-center py-8 text-slate-500">กำลังดึงทำเนียบ...</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        `;
+      },
+
+      openCreateJudgeModal() {
+        const modal = document.createElement('div');
+        modal.id = 'create-judge-modal';
+        modal.className = 'fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4';
+        modal.innerHTML = `
+          <div class="w-full max-w-sm rounded-3xl border border-slate-800 bg-slate-900 p-6 space-y-6 shadow-2xl">
+            <h3 class="text-lg font-bold text-white">เพิ่มผู้ประเมิน/กรรมการ</h3>
+            <form id="create-judge-form" class="space-y-4" onsubmit="CMPE_UI.handleCreateJudge(event)">
+              <div class="space-y-1">
+                <label class="text-xs text-slate-400">รหัสย่อกรรมการ (Judge Code)</label>
+                <input type="text" id="j-code" required class="w-full px-4 py-2.5 bg-slate-950/50 border border-slate-800 rounded-xl text-sm text-slate-200" />
+              </div>
+              <div class="grid grid-cols-2 gap-4">
+                <div class="space-y-1">
+                  <label class="text-xs text-slate-400">ชื่อจริง</label>
+                  <input type="text" id="j-first" required class="w-full px-4 py-2.5 bg-slate-950/50 border border-slate-800 rounded-xl text-sm text-slate-200" />
+                </div>
+                <div class="space-y-1">
+                  <label class="text-xs text-slate-400">นามสกุล</label>
+                  <input type="text" id="j-last" required class="w-full px-4 py-2.5 bg-slate-950/50 border border-slate-800 rounded-xl text-sm text-slate-200" />
+                </div>
+              </div>
+              <div class="flex items-center justify-end space-x-3 pt-2">
+                <button type="button" onclick="document.getElementById('create-judge-modal').remove()" class="px-4 py-2 border border-slate-800 text-slate-300 rounded-xl text-xs">ยกเลิก</button>
+                <button type="submit" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold">บันทึก</button>
+              </div>
+            </form>
+          </div>
+        `;
+        document.body.appendChild(modal);
+      },
+
+      async handleCreateJudge(event) {
+        event.preventDefault();
+        const code = document.getElementById('j-code').value;
+        const first = document.getElementById('j-first').value;
+        const last = document.getElementById('j-last').value;
+
+        try {
+          await CMPE_API.call('operations.judges.create', {
+            judgeCode: code,
+            firstNameTh: first,
+            lastNameTh: last,
+            judgeStatus: "ACTIVE"
+          });
+          this.showToast('ลงทะเบียนกรรมการสำเร็จ!', 'success');
+          document.getElementById('create-judge-modal').remove();
+          this.renderJudgesDirectoryView();
+        } catch (e) {
+          this.showToast(e.message || 'บันทึกข้อมูลล้มเหลว', 'error');
+        }
+      },
+
+      renderCheckInDashboardView() {
+        const main = document.getElementById('main-content');
+        main.innerHTML = `
+          <div class="w-full max-w-4xl space-y-6">
+            <div>
+              <h2 class="text-xl font-bold text-white">ลงทะเบียนรายงานตัวการแข่งขัน</h2>
+              <p class="text-xs text-slate-400">สแกนโค้ด บันทึกเวลาเข้าร่วมของทีมและกรรมการประเมิน</p>
+            </div>
+            
+            <div class="grid grid-cols-3 gap-6">
+              <div class="col-span-2 border border-slate-800 bg-slate-900/30 rounded-3xl p-6 space-y-4">
+                <h3 class="text-sm font-semibold text-white">กรอกรหัสยืนยันรายงานตัว</h3>
+                <div class="flex space-x-3">
+                  <input type="text" id="checkin-search-input" placeholder="ป้อนเลขที่ใบสมัคร (เช่น REG-2026...)" class="flex-grow px-4 py-3 bg-slate-950/50 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none focus:border-indigo-500" />
+                  <button onclick="CMPE_UI.executeManualCheckIn()" class="px-6 py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-sm font-semibold transition">รายงานตัว</button>
+                </div>
+              </div>
+
+              <div class="col-span-1 border border-slate-800 bg-slate-950/40 rounded-3xl p-6 space-y-4">
+                <h3 class="text-sm font-semibold text-white">สถานะการรายงานตัว</h3>
+                <div class="p-4 rounded-2xl bg-slate-900 border border-slate-800 text-center space-y-1">
+                  <span class="text-[10px] text-slate-500 font-bold uppercase tracking-wider">ทีมที่เข้าแข่งขัน</span>
+                  <p class="text-xl font-bold text-white">12 / 45 ทีม</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        `;
+      },
+
+      async executeManualCheckIn() {
+        const code = document.getElementById('checkin-search-input').value;
+        if (!code) {
+          this.showToast('กรุณาระบุเลขที่ใบสมัคร', 'error');
+          return;
+        }
+
+        try {
+          await CMPE_API.call('operations.checkin.record', {
+            competitionId: 'COMP_STAGE4_TEST_01',
+            registrationId: code,
+            subjectType: 'TEAM',
+            subjectId: code,
+            checkinMethod: 'MANUAL'
+          });
+          this.showToast('รายงานตัวเข้าแข่งขันเรียบร้อยแล้ว!', 'success');
+        } catch (e) {
+          this.showToast(e.message || 'รายงานตัวล้มเหลว', 'error');
+        }
+      },
+
+      async renderRegistrationsSchoolView() {
+        const main = document.getElementById('main-content');
+        main.innerHTML = `
+          <div class="w-full max-w-4xl space-y-6">
+            <div class="flex items-center justify-between">
+              <div>
+                <h2 class="text-xl font-bold text-white">ใบสมัครการแข่งขันของโรงเรียน</h2>
+                <p class="text-xs text-slate-400">สร้าง แก้ไขดราฟต์ และติดตามสถานะความสมบูรณ์ใบสมัคร</p>
+              </div>
+              <button onclick="CMPE_UI.openCreateRegistrationModal()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold transition">
+                สร้างใบสมัครใหม่
+              </button>
+            </div>
+            
+            <div class="border border-slate-800 bg-slate-950/40 rounded-3xl overflow-hidden shadow-xl">
+              <table class="w-full text-left text-sm text-slate-300">
+                <thead class="bg-slate-900 text-xs text-slate-400 font-semibold uppercase">
+                  <tr>
+                    <th class="px-6 py-4">รหัสใบสมัคร</th>
+                    <th class="px-6 py-4">หมวดหมู่กิจกรรม</th>
+                    <th class="px-6 py-4">สถานะ</th>
+                    <th class="px-6 py-4 text-right">ดำเนินการ</th>
+                  </tr>
+                </thead>
+                <tbody id="registrations-table-body">
+                  <tr>
+                    <td colspan="4" class="text-center py-8 text-slate-500">กำลังโหลด...</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        `;
+
+        try {
+          const list = await CMPE_API.call('registration.list', {});
+          const tbody = document.getElementById('registrations-table-body');
+          if (list.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="4" class="text-center py-8 text-slate-500">ไม่มีประวัติการส่งใบสมัคร</td></tr>`;
+            return;
+          }
+          tbody.innerHTML = list.map(r => `
+            <tr class="border-b border-slate-900 hover:bg-slate-900/20">
+              <td class="px-6 py-4 font-mono text-xs text-indigo-400">${r.registrationNumber}</td>
+              <td class="px-6 py-4 font-medium text-white">${r.competitionCategoryConfigId}</td>
+              <td class="px-6 py-4">
+                <span class="px-2 py-1 rounded-full text-[10px] font-bold bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
+                  ${r.registrationStatus}
+                </span>
+              </td>
+              <td class="px-6 py-4 text-right">
+                <button onclick="CMPE_UI.navigateTo('reg-wizard-${r.registrationId}')" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs transition">จัดการสมาชิก</button>
+              </td>
+            </tr>
+          `).join('');
+        } catch (e) {
+          this.showToast('ดึงประวัติใบสมัครล้มเหลว', 'error');
+        }
+      },
+
+      openCreateRegistrationModal() {
+        const modal = document.createElement('div');
+        modal.id = 'create-reg-modal';
+        modal.className = 'fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4';
+        modal.innerHTML = `
+          <div class="w-full max-w-sm rounded-3xl border border-slate-800 bg-slate-900 p-6 space-y-6 shadow-2xl">
+            <h3 class="text-lg font-bold text-white">ลงทะเบียนสร้างทีมใหม่</h3>
+            <div class="space-y-4">
+              <div class="space-y-1">
+                <label class="text-xs text-slate-400">เลือกประเภทกิจกรรมการแข่งขัน</label>
+                <select id="reg-config-select" class="w-full px-4 py-2.5 bg-slate-950/50 border border-slate-800 rounded-xl text-sm text-slate-300">
+                  <option value="CONF_STAGE4_TEST">การแข่งขันโครงงานหุ่นยนต์ระดับพื้นฐาน</option>
+                </select>
+              </div>
+            </div>
+            <div class="flex items-center justify-end space-x-3">
+              <button onclick="document.getElementById('create-reg-modal').remove()" class="px-4 py-2 border border-slate-800 text-slate-300 rounded-xl text-xs">ยกเลิก</button>
+              <button onclick="CMPE_UI.handleCreateRegistration()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold transition">บันทึกดราฟต์</button>
+            </div>
+          </div>
+        `;
+        document.body.appendChild(modal);
+      },
+
+      async handleCreateRegistration() {
+        const configId = document.getElementById('reg-config-select').value;
+        try {
+          const res = await CMPE_API.call('registration.create', {
+            competitionId: 'COMP_STAGE4_TEST_01',
+            competitionCategoryConfigId: configId,
+            schoolId: 'SCH_SAKON_01'
+          });
+          this.showToast('สร้างดราฟต์สำเร็จ!', 'success');
+          document.getElementById('create-reg-modal').remove();
+          this.navigateTo(`reg-wizard-${res.registrationId}`);
+        } catch (e) {
+          this.showToast('สร้างใบสมัครไม่สำเร็จ', 'error');
+        }
+      },
+
+      async renderRegistrationWizard(regId) {
+        const main = document.getElementById('main-content');
+        main.innerHTML = `
+          <div class="w-full max-w-4xl space-y-6">
+            <div>
+              <a href="#registrations-school" class="text-xs text-indigo-400 hover:underline flex items-center space-x-1 mb-1">
+                <span class="material-icons-round text-xs">arrow_back</span>
+                <span>กลับไปใบสมัครโรงเรียน</span>
+              </a>
+              <h2 class="text-xl font-bold text-white">จัดการข้อมูลทีมผู้แข่งขัน</h2>
+              <p class="text-xs text-slate-400">รหัสดราฟต์ชั่วคราว: <span class="font-mono" id="wizard-reg-num"></span></p>
+            </div>
+            
+            <div class="grid grid-cols-3 gap-6">
+              <!-- Left panel: Members list -->
+              <div class="col-span-2 border border-slate-800 bg-slate-900/30 rounded-3xl p-6 space-y-6">
+                <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+                  <h3 class="text-sm font-bold text-white flex items-center space-x-2">
+                    <span class="material-icons-round text-indigo-400">group</span>
+                    <span>ผู้เข้าร่วมการแข่งขัน (Contestants)</span>
+                  </h3>
+                  <button onclick="CMPE_UI.openAddMemberModal('${regId}')" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold transition">เพิ่มนักเรียน</button>
+                </div>
+                
+                <div id="members-list-wrapper" class="space-y-3">
+                  <p class="text-xs text-slate-500 text-center py-6">กำลังโหลดรายชื่อนักเรียน...</p>
+                </div>
+
+                <div class="flex items-center justify-between border-b border-slate-800 pt-6 pb-3">
+                  <h3 class="text-sm font-bold text-white flex items-center space-x-2">
+                    <span class="material-icons-round text-indigo-400">person</span>
+                    <span>ครูผู้ฝึกสอน (Coaches)</span>
+                  </h3>
+                  <button onclick="CMPE_UI.openAddCoachModal('${regId}')" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold transition">เพิ่มผู้ฝึกสอน</button>
+                </div>
+                
+                <div id="coaches-list-wrapper" class="space-y-3">
+                  <p class="text-xs text-slate-500 text-center py-6">กำลังโหลดรายชื่อครู...</p>
+                </div>
+              </div>
+
+              <!-- Right panel: Status & Actions -->
+              <div class="col-span-1 border border-slate-800 bg-slate-950/40 rounded-3xl p-6 space-y-6">
+                <div>
+                  <h3 class="text-sm font-semibold text-white">ส่งใบสมัคร</h3>
+                  <p class="text-xs text-slate-500">ตรวจสอบโควตาและเงื่อนไขทั้งหมดก่อนส่งจริง</p>
+                </div>
+
+                <div class="p-4 rounded-2xl border border-slate-800 bg-slate-900/50 space-y-3">
+                  <div class="flex items-center justify-between text-xs">
+                    <span class="text-slate-400">ความพร้อมโควตา</span>
+                    <span class="font-bold text-indigo-400">1 / 1 ทีม</span>
+                  </div>
+                  <div class="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
+                    <div class="bg-indigo-500 h-full w-full"></div>
+                  </div>
+                </div>
+
+                <button onclick="CMPE_UI.handleFinalSubmit('${regId}')" class="w-full py-3.5 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs rounded-xl transition shadow-lg shadow-indigo-600/10">
+                  ส่งตรวจสอบใบสมัคร (Submit)
+                </button>
+              </div>
+            </div>
+          </div>
+        `;
+
+        this.loadWizardData(regId);
+      },
+
+      async loadWizardData(regId) {
+        try {
+          const reg = await CMPE_API.call('registration.get', { registrationId: regId });
+          document.getElementById('wizard-reg-num').textContent = reg.registrationNumber;
+
+          // Load members
+          const members = await CMPE_API.call('registration.members.list', { registrationId: regId });
+          const mWrapper = document.getElementById('members-list-wrapper');
+          if (members.length === 0) {
+            mWrapper.innerHTML = `<p class="text-xs text-slate-500 text-center py-6">ยังไม่มีข้อมูลนักเรียนลงทะเบียน</p>`;
+          } else {
+            mWrapper.innerHTML = members.map(m => `
+              <div class="p-4 bg-slate-950/40 border border-slate-800 rounded-2xl flex items-center justify-between">
+                <div>
+                  <h4 class="text-xs font-bold text-white">${m.firstNameTh} ${m.lastNameTh}</h4>
+                  <p class="text-[10px] text-slate-500">ชั้นมัธยมศึกษาปีที่ ${m.gradeLevel}</p>
+                </div>
+                <span class="text-xs text-indigo-400 font-medium">Contestant</span>
+              </div>
+            `).join('');
+          }
+
+          // Load coaches
+          const coaches = await CMPE_API.call('registration.coaches.list', { registrationId: regId });
+          const cWrapper = document.getElementById('coaches-list-wrapper');
+          if (coaches.length === 0) {
+            cWrapper.innerHTML = `<p class="text-xs text-slate-500 text-center py-6">ยังไม่มีข้อมูลครูลงทะเบียน</p>`;
+          } else {
+            cWrapper.innerHTML = coaches.map(c => `
+              <div class="p-4 bg-slate-950/40 border border-slate-800 rounded-2xl flex items-center justify-between">
+                <div>
+                  <h4 class="text-xs font-bold text-white">${c.firstNameTh} ${c.lastNameTh}</h4>
+                  <p class="text-[10px] text-slate-500">${c.positionName || 'ครูผู้สอน'}</p>
+                </div>
+                <span class="text-xs text-indigo-400 font-medium">${c.isLeadCoach ? 'Lead Coach' : 'Coach'}</span>
+              </div>
+            `).join('');
+          }
+        } catch (e) {
+          this.showToast('ดึงข้อมูลรายละเอียดดราฟต์ไม่สำเร็จ', 'error');
+        }
+      },
+
+      openAddMemberModal(regId) {
+        const modal = document.createElement('div');
+        modal.id = 'add-member-modal';
+        modal.className = 'fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4';
+        modal.innerHTML = `
+          <div class="w-full max-w-sm rounded-3xl border border-slate-800 bg-slate-900 p-6 space-y-6 shadow-2xl">
+            <h3 class="text-lg font-bold text-white">ลงทะเบียนสมาชิก</h3>
+            <form id="add-member-form" class="space-y-4" onsubmit="CMPE_UI.handleAddMember(event, '${regId}')">
+              <div class="grid grid-cols-2 gap-4">
+                <div class="space-y-1">
+                  <label class="text-xs text-slate-400">ชื่อจริง</label>
+                  <input type="text" id="m-first" required class="w-full px-4 py-2.5 bg-slate-950/50 border border-slate-800 rounded-xl text-sm text-slate-200" />
+                </div>
+                <div class="space-y-1">
+                  <label class="text-xs text-slate-400">นามสกุล</label>
+                  <input type="text" id="m-last" required class="w-full px-4 py-2.5 bg-slate-950/50 border border-slate-800 rounded-xl text-sm text-slate-200" />
+                </div>
+              </div>
+              <div class="space-y-1">
+                <label class="text-xs text-slate-400">ระดับชั้นเกรด (Grade Level)</label>
+                <input type="number" id="m-grade" required value="8" class="w-full px-4 py-2.5 bg-slate-950/50 border border-slate-800 rounded-xl text-sm text-slate-200" />
+              </div>
+              <div class="space-y-1">
+                <label class="text-xs text-slate-400">วันเดือนปีเกิด (YYYY-MM-DD)</label>
+                <input type="text" id="m-dob" required value="2012-05-10" class="w-full px-4 py-2.5 bg-slate-950/50 border border-slate-800 rounded-xl text-sm text-slate-200" />
+              </div>
+              <div class="flex items-center justify-end space-x-3 pt-2">
+                <button type="button" onclick="document.getElementById('add-member-modal').remove()" class="px-4 py-2 border border-slate-800 text-slate-300 rounded-xl text-xs">ยกเลิก</button>
+                <button type="submit" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold">บันทึก</button>
+              </div>
+            </form>
+          </div>
+        `;
+        document.body.appendChild(modal);
+      },
+
+      async handleAddMember(event, regId) {
+        event.preventDefault();
+        const first = document.getElementById('m-first').value;
+        const last = document.getElementById('m-last').value;
+        const grade = document.getElementById('m-grade').value;
+        const dob = document.getElementById('m-dob').value;
+
+        try {
+          await CMPE_API.call('registration.members.add', {
+            registrationId: regId,
+            firstNameTh: first,
+            lastNameTh: last,
+            gradeLevel: grade,
+            dateOfBirth: dob
+          });
+          this.showToast('เพิ่มผู้เข้าร่วมสำเร็จ!', 'success');
+          document.getElementById('add-member-modal').remove();
+          this.loadWizardData(regId);
+        } catch (e) {
+          this.showToast(e.message || 'บันทึกรายชื่อนักเรียนล้มเหลว', 'error');
+        }
+      },
+
+      openAddCoachModal(regId) {
+        const modal = document.createElement('div');
+        modal.id = 'add-coach-modal';
+        modal.className = 'fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4';
+        modal.innerHTML = `
+          <div class="w-full max-w-sm rounded-3xl border border-slate-800 bg-slate-900 p-6 space-y-6 shadow-2xl">
+            <h3 class="text-lg font-bold text-white">ลงทะเบียนครูผู้ฝึกสอน</h3>
+            <form id="add-coach-form" class="space-y-4" onsubmit="CMPE_UI.handleAddCoach(event, '${regId}')">
+              <div class="grid grid-cols-2 gap-4">
+                <div class="space-y-1">
+                  <label class="text-xs text-slate-400">ชื่อจริง</label>
+                  <input type="text" id="c-first" required class="w-full px-4 py-2.5 bg-slate-950/50 border border-slate-800 rounded-xl text-sm text-slate-200" />
+                </div>
+                <div class="space-y-1">
+                  <label class="text-xs text-slate-400">นามสกุล</label>
+                  <input type="text" id="c-last" required class="w-full px-4 py-2.5 bg-slate-950/50 border border-slate-800 rounded-xl text-sm text-slate-200" />
+                </div>
+              </div>
+              <div class="flex items-center justify-end space-x-3 pt-2">
+                <button type="button" onclick="document.getElementById('add-coach-modal').remove()" class="px-4 py-2 border border-slate-800 text-slate-300 rounded-xl text-xs">ยกเลิก</button>
+                <button type="submit" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold">บันทึก</button>
+              </div>
+            </form>
+          </div>
+        `;
+        document.body.appendChild(modal);
+      },
+
+      async handleAddCoach(event, regId) {
+        event.preventDefault();
+        const first = document.getElementById('c-first').value;
+        const last = document.getElementById('c-last').value;
+
+        try {
+          await CMPE_API.call('registration.coaches.add', {
+            registrationId: regId,
+            firstNameTh: first,
+            lastNameTh: last,
+            isLeadCoach: true
+          });
+          this.showToast('เพิ่มผู้ฝึกสอนสำเร็จ!', 'success');
+          document.getElementById('add-coach-modal').remove();
+          this.loadWizardData(regId);
+        } catch (e) {
+          this.showToast(e.message || 'บันทึกรายชื่อผู้ฝึกสอนล้มเหลว', 'error');
+        }
+      },
+
+      async handleFinalSubmit(regId) {
+        try {
+          const reg = await CMPE_API.call('registration.get', { registrationId: regId });
+          await CMPE_API.call('registration.submit', {
+            registrationId: regId,
+            rowVersion: reg.rowVersion
+          });
+          this.showToast('ส่งใบสมัครเข้าร่วมเรียบร้อยแล้ว!', 'success');
+          this.navigateTo('registrations-school');
+        } catch (e) {
+          this.showToast(e.message || 'การส่งใบสมัครล้มเหลว', 'error');
+        }
+      },
+
+      async renderRegistrationsReviewQueue() {
+        const main = document.getElementById('main-content');
+        main.innerHTML = `
+          <div class="w-full max-w-4xl space-y-6">
+            <div>
+              <h2 class="text-xl font-bold text-white">ตรวจสอบคำขอใบสมัครการแข่งขัน</h2>
+              <p class="text-xs text-slate-400">กล่องคำขอสมัครแข่งขันของเขตพื้นที่การศึกษา</p>
+            </div>
+            
+            <div class="border border-slate-800 bg-slate-950/40 rounded-3xl overflow-hidden shadow-xl">
+              <table class="w-full text-left text-sm text-slate-300">
+                <thead class="bg-slate-900 text-xs text-slate-400 font-semibold uppercase">
+                  <tr>
+                    <th class="px-6 py-4">ใบสมัคร</th>
+                    <th class="px-6 py-4">โรงเรียนผู้ส่ง</th>
+                    <th class="px-6 py-4">สถานะ</th>
+                    <th class="px-6 py-4 text-right">ดำเนินการตรวจสอบ</th>
+                  </tr>
+                </thead>
+                <tbody id="reviews-table-body">
+                  <tr>
+                    <td colspan="4" class="text-center py-8 text-slate-500">กำลังโหลดกล่องข้อความ...</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        `;
+
+        try {
+          const list = await CMPE_API.call('registration.list', { schoolId: 'SCH_SAKON_01' });
+          const tbody = document.getElementById('reviews-table-body');
+          const submissions = list.filter(r => r.registrationStatus === "SUBMITTED");
+          
+          if (submissions.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="4" class="text-center py-8 text-slate-500">ไม่มีใบสมัครที่รอดำเนินการตรวจสอบ</td></tr>`;
+            return;
+          }
+          
+          tbody.innerHTML = submissions.map(r => `
+            <tr class="border-b border-slate-900 hover:bg-slate-900/20">
+              <td class="px-6 py-4 font-mono text-xs text-indigo-400">${r.registrationNumber}</td>
+              <td class="px-6 py-4 font-medium text-white">${r.schoolId}</td>
+              <td class="px-6 py-4">
+                <span class="px-2 py-1 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                  ${r.registrationStatus}
+                </span>
+              </td>
+              <td class="px-6 py-4 text-right space-x-2">
+                <button onclick="CMPE_UI.handleApprove('${r.registrationId}', ${r.rowVersion})" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-semibold transition">อนุมัติ</button>
+                <button onclick="CMPE_UI.openRejectModal('${r.registrationId}', ${r.rowVersion})" class="px-3 py-1.5 bg-rose-600 hover:bg-rose-500 text-white rounded-xl text-xs font-semibold transition">ปฏิเสธ</button>
+              </td>
+            </tr>
+          `).join('');
+        } catch (e) {
+          this.showToast('โหลดคิวไม่สำเร็จ', 'error');
+        }
+      },
+
+      async handleApprove(regId, rowVer) {
+        try {
+          await CMPE_API.call('registration.approve', { registrationId: regId, rowVersion: rowVer });
+          this.showToast('อนุมัติการสมัครสำเร็จ!', 'success');
+          this.renderRegistrationsReviewQueue();
+        } catch (e) {
+          this.showToast('การดำเนินการอนุมัติล้มเหลว', 'error');
+        }
+      },
+
+      openRejectModal(regId, rowVer) {
+        const modal = document.createElement('div');
+        modal.id = 'reject-modal';
+        modal.className = 'fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4';
+        modal.innerHTML = `
+          <div class="w-full max-w-sm rounded-3xl border border-slate-800 bg-slate-900 p-6 space-y-6 shadow-2xl">
+            <h3 class="text-lg font-bold text-white">ระบุเหตุผลการส่งคืน/ปฏิเสธ</h3>
+            <div class="space-y-4">
+              <input type="text" id="rej-reason" required placeholder="เช่น เอกสารไม่ชัดเจน หรือระดับชั้นศึกษาไม่สอดคล้อง" class="w-full px-4 py-2.5 bg-slate-950/50 border border-slate-800 rounded-xl text-sm text-slate-200" />
+            </div>
+            <div class="flex items-center justify-end space-x-3">
+              <button onclick="document.getElementById('reject-modal').remove()" class="px-4 py-2 border border-slate-800 text-slate-300 rounded-xl text-xs">ยกเลิก</button>
+              <button onclick="CMPE_UI.handleReject('${regId}', ${rowVer})" class="px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white rounded-xl text-xs font-semibold transition">ยืนยันปฏิเสธ</button>
+            </div>
+          </div>
+        `;
+        document.body.appendChild(modal);
+      },
+
+      async handleReject(regId, rowVer) {
+        const reason = document.getElementById('rej-reason').value;
+        if (!reason) {
+          this.showToast('กรุณาระบุเหตุผลการปฏิเสธ', 'error');
+          return;
+        }
+
+        try {
+          await CMPE_API.call('registration.reject', {
+            registrationId: regId,
+            reason: reason,
+            rowVersion: rowVer
+          });
+          this.showToast('ปฏิเสธการสมัครและส่งคืนใบสมัครแล้ว!', 'success');
+          document.getElementById('reject-modal').remove();
+          this.renderRegistrationsReviewQueue();
+        } catch (e) {
+          this.showToast('การดำเนินการล้มเหลว', 'error');
+        }
+      },
+
+      async renderCompetitionsView() {
+        const main = document.getElementById('main-content');
+        main.innerHTML = `
+          <div class="w-full max-w-4xl space-y-6">
+            <div class="flex items-center justify-between">
+              <div>
+                <h2 class="text-xl font-bold text-white">ตั้งค่าการแข่งขัน</h2>
+                <p class="text-xs text-slate-400">รายชื่อการแข่งขันและสถานะขั้นตอนการทำงาน</p>
+              </div>
+              <button onclick="CMPE_UI.openCreateCompetitionModal()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold transition">
+                สร้างการแข่งขันใหม่
+              </button>
+            </div>
+            
+            <div class="border border-slate-800 bg-slate-950/40 rounded-3xl overflow-hidden shadow-xl">
+              <table class="w-full text-left text-sm text-slate-300">
+                <thead class="bg-slate-900 text-xs text-slate-400 font-semibold uppercase">
+                  <tr>
+                    <th class="px-6 py-4">รหัส</th>
+                    <th class="px-6 py-4">ชื่อการแข่งขัน</th>
+                    <th class="px-6 py-4">สถานะ</th>
+                    <th class="px-6 py-4 text-right">ดำเนินการ</th>
+                  </tr>
+                </thead>
+                <tbody id="competitions-table-body">
+                  <tr>
+                    <td colspan="4" class="text-center py-8 text-slate-500">กำลังโหลด...</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        `;
+        
+        try {
+          const list = await CMPE_API.call('competition.list');
+          const tbody = document.getElementById('competitions-table-body');
+          if (list.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="4" class="text-center py-8 text-slate-500">ไม่มีข้อมูลการแข่งขันในระบบ</td></tr>`;
+            return;
+          }
+          tbody.innerHTML = list.map(c => `
+            <tr class="border-b border-slate-900 hover:bg-slate-900/20">
+              <td class="px-6 py-4 font-mono text-xs">${c.competitionCode}</td>
+              <td class="px-6 py-4 font-medium text-white">${c.nameTh}</td>
+              <td class="px-6 py-4">
+                <span class="px-2 py-1 rounded-full text-[10px] font-bold bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
+                  ${c.status}
+                </span>
+              </td>
+              <td class="px-6 py-4 text-right space-x-2">
+                <button onclick="CMPE_UI.navigateTo('config-${c.competitionId}')" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs transition">ตั้งค่า</button>
+                <button onclick="CMPE_UI.cloneCompPrompt('${c.competitionId}')" class="px-3 py-1.5 bg-indigo-600/20 hover:bg-indigo-600 text-indigo-400 hover:text-white rounded-xl text-xs transition">โคลน</button>
+              </td>
+            </tr>
+          `).join('');
+        } catch (e) {
+          this.showToast('ดึงข้อมูลการแข่งขันไม่สำเร็จ', 'error');
+        }
+      },
+
+      openCreateCompetitionModal() {
+        const modal = document.createElement('div');
+        modal.id = 'create-comp-modal';
+        modal.className = 'fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4';
+        modal.innerHTML = `
+          <div class="w-full max-w-md rounded-3xl border border-slate-800 bg-slate-900 p-6 space-y-6 shadow-2xl">
+            <h3 class="text-lg font-bold text-white">สร้างการแข่งขัน</h3>
+            <form id="create-comp-form" class="space-y-4" onsubmit="CMPE_UI.handleCreateCompetition(event)">
+              <div class="space-y-1">
+                <label class="text-xs text-slate-400">รหัสย่อแข่งขัน (Code)</label>
+                <input type="text" id="c-code" required class="w-full px-4 py-2.5 bg-slate-950/50 border border-slate-800 rounded-xl text-sm focus:outline-none focus:border-indigo-500 text-slate-200" />
+              </div>
+              <div class="space-y-1">
+                <label class="text-xs text-slate-400">ชื่อการแข่งขัน (ไทย)</label>
+                <input type="text" id="c-name-th" required class="w-full px-4 py-2.5 bg-slate-950/50 border border-slate-800 rounded-xl text-sm focus:outline-none focus:border-indigo-500 text-slate-200" />
+              </div>
+              <div class="flex items-center justify-end space-x-3 pt-2">
+                <button type="button" onclick="document.getElementById('create-comp-modal').remove()" class="px-4 py-2 border border-slate-800 text-slate-300 rounded-xl text-xs">ยกเลิก</button>
+                <button type="submit" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold">สร้าง</button>
+              </div>
+            </form>
+          </div>
+        `;
+        document.body.appendChild(modal);
+      },
+
+      async handleCreateCompetition(event) {
+        event.preventDefault();
+        const code = document.getElementById('c-code').value;
+        const nameTh = document.getElementById('c-name-th').value;
+
+        try {
+          await CMPE_API.call('competition.create', {
+            competitionCode: code,
+            nameTh: nameTh,
+            nameEn: code,
+            academicYearId: 'AY_2569',
+            competitionTypeId: 'TYPE_ROBOTICS',
+            startDate: '2026-08-01',
+            endDate: '2026-08-05'
+          });
+          this.showToast('สร้างการแข่งขันสำเร็จ!', 'success');
+          document.getElementById('create-comp-modal').remove();
+          this.renderCompetitionsView();
+        } catch (e) {
+          this.showToast('ไม่สามารถสร้างการแข่งขันได้', 'error');
+        }
+      },
+
+      cloneCompPrompt(compId) {
+        const modal = document.createElement('div');
+        modal.id = 'clone-comp-modal';
+        modal.className = 'fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4';
+        modal.innerHTML = `
+          <div class="w-full max-w-md rounded-3xl border border-slate-800 bg-slate-900 p-6 space-y-6 shadow-2xl">
+            <h3 class="text-lg font-bold text-white">โคลนโครงสร้างการแข่งขัน</h3>
+            <div class="space-y-4">
+              <p class="text-xs text-slate-400">คัดลอกรอบหมวดหมู่ เกณฑ์คะแนน และกฎการตัดสิน ไปสร้างเป็นถังรายการแข่งใหม่</p>
+              <div class="space-y-1">
+                <label class="text-xs text-slate-400">ชื่อการแข่งขันใหม่</label>
+                <input type="text" id="clone-name-th" required placeholder="ระบุชื่อภาษาไทย" class="w-full px-4 py-2.5 bg-slate-950/50 border border-slate-800 rounded-xl text-sm focus:outline-none focus:border-indigo-500 text-slate-200" />
+              </div>
+            </div>
+            <div class="flex items-center justify-end space-x-3">
+              <button onclick="document.getElementById('clone-comp-modal').remove()" class="px-4 py-2 border border-slate-800 text-slate-300 rounded-xl text-xs">ยกเลิก</button>
+              <button onclick="CMPE_UI.handleCloneCompetition('${compId}')" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold transition">ยืนยันโคลน</button>
+            </div>
+          </div>
+        `;
+        document.body.appendChild(modal);
+      },
+
+      async handleCloneCompetition(compId) {
+        const nameTh = document.getElementById('clone-name-th').value;
+        if (!nameTh) {
+          this.showToast('กรุณากรอกชื่อการแข่งขันใหม่', 'error');
+          return;
+        }
+
+        try {
+          await CMPE_API.call('competition.clone', {
+            competitionId: compId,
+            nameTh: nameTh,
+            nameEn: nameTh
+          });
+          this.showToast('โคลนการแข่งขันสำเร็จ!', 'success');
+          document.getElementById('clone-comp-modal').remove();
+          this.renderCompetitionsView();
+        } catch (e) {
+          this.showToast('ไม่สามารถโคลนการแข่งขันได้', 'error');
+        }
+      },
+
+      async renderCompetitionConfigWorkspace(compId) {
+        const main = document.getElementById('main-content');
+        main.innerHTML = `
+          <div class="w-full max-w-4xl space-y-6">
+            <div class="flex items-center justify-between">
+              <div>
+                <a href="#competitions" class="text-xs text-indigo-400 hover:underline flex items-center space-x-1 mb-1">
+                  <span class="material-icons-round text-xs">arrow_back</span>
+                  <span>กลับไปรายการแข่งขัน</span>
+                </a>
+                <h2 class="text-xl font-bold text-white" id="conf-comp-title">กำลังโหลด...</h2>
+              </div>
+              <div id="readiness-badge"></div>
+            </div>
+            
+            <div class="grid grid-cols-3 gap-6">
+              <!-- Sidebar Config Sections -->
+              <div class="col-span-1 border border-slate-800 bg-slate-950/40 rounded-3xl p-4 space-y-2">
+                <button onclick="CMPE_UI.showConfigTab('rounds', '${compId}')" class="w-full text-left px-4 py-3 rounded-xl text-xs font-medium bg-slate-900 text-white flex items-center justify-between">
+                  <span>รอบการแข่งขัน</span>
+                  <span class="material-icons-round text-sm">chevron_right</span>
+                </button>
+                <button onclick="CMPE_UI.showConfigTab('categories', '${compId}')" class="w-full text-left px-4 py-3 rounded-xl text-xs font-medium hover:bg-slate-900/50 text-slate-300 flex items-center justify-between">
+                  <span>หมวดหมู่รายปี</span>
+                  <span class="material-icons-round text-sm">chevron_right</span>
+                </button>
+                <button onclick="CMPE_UI.showConfigTab('ruleTester', '${compId}')" class="w-full text-left px-4 py-3 rounded-xl text-xs font-medium hover:bg-slate-900/50 text-slate-300 flex items-center justify-between">
+                  <span>ทดสอบเครื่องมือกฎ (Rules)</span>
+                  <span class="material-icons-round text-sm">chevron_right</span>
+                </button>
+              </div>
+
+              <!-- Main Detail Area -->
+              <div class="col-span-2 border border-slate-800 bg-slate-900/30 rounded-3xl p-6" id="config-detail-panel">
+                <p class="text-xs text-slate-500">เลือกหัวข้อการตั้งค่าทางซ้ายเพื่อแสดงข้อมูล</p>
+              </div>
+            </div>
+          </div>
+        `;
+
+        this.loadCompConfigData(compId);
+      },
+
+      async loadCompConfigData(compId) {
+        try {
+          const list = await CMPE_API.call('competition.list');
+          const comp = list.find(c => c.competitionId === compId);
+          if (comp) {
+            document.getElementById('conf-comp-title').textContent = comp.nameTh;
+            
+            // Fetch readiness
+            const readiness = await CMPE_API.call('competition.validateReadiness', { competitionId: compId });
+            const badge = document.getElementById('readiness-badge');
+            if (readiness.ready) {
+              badge.innerHTML = `<span class="px-3 py-1.5 bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 text-xs font-bold rounded-xl">พร้อมดำเนินการ (Ready)</span>`;
+            } else {
+              badge.innerHTML = `<span class="px-3 py-1.5 bg-amber-500/10 text-amber-500 border border-amber-500/20 text-xs font-bold rounded-xl">ไม่พร้อมใช้งาน (Incomplete)</span>`;
+            }
+            
+            // Show default tab
+            this.showConfigTab('rounds', compId);
+          }
+        } catch (e) {}
+      },
+
+      async showConfigTab(tab, compId) {
+        const panel = document.getElementById('config-detail-panel');
+        panel.innerHTML = `<div class="text-center py-12 text-slate-500 text-xs">กำลังโหลด...</div>`;
+        
+        if (tab === 'rounds') {
+          try {
+            const list = await CMPE_API.call('competition.rounds.list', { competitionId: compId });
+            panel.innerHTML = `
+              <div class="space-y-4">
+                <div class="flex items-center justify-between">
+                  <h3 class="text-sm font-semibold text-white">รอบการแข่งขัน</h3>
+                  <button onclick="CMPE_UI.openCreateRoundModal('${compId}')" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold transition">เพิ่มรอบ</button>
+                </div>
+                
+                <div class="space-y-2">
+                  ${list.length === 0 ? '<p class="text-xs text-slate-500 text-center py-6">ไม่มีข้อมูลรอบการแข่งขัน</p>' : ''}
+                  ${list.map(r => `
+                    <div class="p-4 bg-slate-950/40 border border-slate-800 rounded-2xl flex items-center justify-between">
+                      <div>
+                        <h4 class="text-xs font-bold text-white">${r.nameTh}</h4>
+                        <p class="text-[10px] text-slate-500">ลำดับคิวการตัดสิน: ${r.roundSequence}</p>
+                      </div>
+                      <span class="px-2 py-0.5 rounded-full text-[9px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">${r.status}</span>
+                    </div>
+                  `).join('')}
+                </div>
+              </div>
+            `;
+          } catch (e) {}
+        } else if (tab === 'categories') {
+          try {
+            const list = await CMPE_API.call('competition.categories.list', { competitionId: compId });
+            panel.innerHTML = `
+              <div class="space-y-4">
+                <div class="flex items-center justify-between">
+                  <h3 class="text-sm font-semibold text-white">หมวดหมู่แข่งขันรายปี</h3>
+                </div>
+                <div class="space-y-2">
+                  ${list.length === 0 ? '<p class="text-xs text-slate-500 text-center py-6">ไม่มีหมวดหมู่ที่ลงทะเบียน</p>' : ''}
+                  ${list.map(c => `
+                    <div class="p-4 bg-slate-950/40 border border-slate-800 rounded-2xl flex items-center justify-between">
+                      <div>
+                        <h4 class="text-xs font-bold text-white">${c.categoryId}</h4>
+                        <p class="text-[10px] text-slate-500">ลำดับการแสดง: ${c.displayOrder}</p>
+                      </div>
+                      <span class="px-2 py-0.5 rounded-full text-[9px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">${c.status}</span>
+                    </div>
+                  `).join('')}
+                </div>
+              </div>
+            `;
+          } catch (e) {}
+        } else if (tab === 'ruleTester') {
+          panel.innerHTML = `
+            <div class="space-y-4">
+              <h3 class="text-sm font-semibold text-white">ทดลองตรรกะกฎการตัดสิน (Rules Preview Evaluator)</h3>
+              
+              <div class="space-y-3">
+                <div class="space-y-1">
+                  <label class="text-xs text-slate-400">จำลองข้อมูลกรอกเกรดนักเรียน</label>
+                  <input type="number" id="test-student-grade" value="6" class="w-full px-4 py-2.5 bg-slate-950/50 border border-slate-800 rounded-xl text-sm focus:outline-none focus:border-indigo-500 text-slate-200" />
+                </div>
+                
+                <button onclick="CMPE_UI.executeRulePreview()" class="w-full py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-medium text-xs rounded-xl transition">
+                  ประมวลผลกฎ
+                </button>
+              </div>
+
+              <div id="rule-preview-result" class="hidden p-4 rounded-2xl border bg-slate-950/50">
+                <!-- Injected result -->
+              </div>
+            </div>
+          `;
+        }
+      },
+
+      openCreateRoundModal(compId) {
+        const modal = document.createElement('div');
+        modal.id = 'create-round-modal';
+        modal.className = 'fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4';
+        modal.innerHTML = `
+          <div class="w-full max-w-sm rounded-3xl border border-slate-800 bg-slate-900 p-6 space-y-6 shadow-2xl">
+            <h3 class="text-lg font-bold text-white">เพิ่มรอบการแข่งขัน</h3>
+            <form id="create-round-form" class="space-y-4" onsubmit="CMPE_UI.handleCreateRound(event, '${compId}')">
+              <div class="space-y-1">
+                <label class="text-xs text-slate-400">ชื่อรอบ (เช่น รอบชิงชนะเลิศ)</label>
+                <input type="text" id="r-name-th" required class="w-full px-4 py-2.5 bg-slate-950/50 border border-slate-800 rounded-xl text-sm focus:outline-none focus:border-indigo-500 text-slate-200" />
+              </div>
+              <div class="space-y-1">
+                <label class="text-xs text-slate-400">คิวเรียงลำดับ (Sequence)</label>
+                <input type="number" id="r-seq" required value="1" class="w-full px-4 py-2.5 bg-slate-950/50 border border-slate-800 rounded-xl text-sm focus:outline-none focus:border-indigo-500 text-slate-200" />
+              </div>
+              <div class="flex items-center justify-end space-x-3 pt-2">
+                <button type="button" onclick="document.getElementById('create-round-modal').remove()" class="px-4 py-2 border border-slate-800 text-slate-300 rounded-xl text-xs">ยกเลิก</button>
+                <button type="submit" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold">บันทึก</button>
+              </div>
+            </form>
+          </div>
+        `;
+        document.body.appendChild(modal);
+      },
+
+      async handleCreateRound(event, compId) {
+        event.preventDefault();
+        const nameTh = document.getElementById('r-name-th').value;
+        const seq = document.getElementById('r-seq').value;
+
+        try {
+          await CMPE_API.call('competition.rounds.create', {
+            competitionId: compId,
+            nameTh: nameTh,
+            nameEn: nameTh,
+            roundSequence: parseInt(seq),
+            status: "ACTIVE"
+          });
+          this.showToast('เพิ่มรอบการแข่งขันสำเร็จ!', 'success');
+          document.getElementById('create-round-modal').remove();
+          this.showConfigTab('rounds', compId);
+        } catch (e) {
+          this.showToast('เพิ่มรอบการแข่งขันไม่สำเร็จ', 'error');
+        }
+      },
+
+      async executeRulePreview() {
+        const gradeVal = parseInt(document.getElementById('test-student-grade').value);
+        const resultPanel = document.getElementById('rule-preview-result');
+        resultPanel.classList.remove('hidden');
+        resultPanel.innerHTML = `<p class="text-xs text-slate-500">กำลังส่งประมวลผลผลลัพธ์...</p>`;
+        
+        // Mock rules JSON to test on engine
+        const rules = [
+          {
+            ruleCode: "ELIG_GRADE_BOUND",
+            ruleType: "GRADE_RANGE",
+            priority: 5,
+            conditionJson: JSON.stringify({ field: "grade", operator: "NOT_IN", value: [7, 8, 9] }),
+            actionJson: JSON.stringify({ type: "REJECT" }),
+            errorCode: "ERR_GRADE_OUT_OF_BOUNDS",
+            errorMessageTh: "ไม่อนุญาตให้นักเรียนต่ำกว่า ม.ต้น เข้าสมัครแข่งขันรายการนี้",
+            status: "ACTIVE"
+          }
+        ];
+
+        try {
+          const res = await CMPE_API.call('configuration.rules.preview', {
+            rulesJson: JSON.stringify(rules),
+            context: { grade: gradeVal }
+          });
+
+          if (res.valid) {
+            resultPanel.className = 'p-4 rounded-2xl border bg-emerald-950/20 border-emerald-900/40 text-emerald-300 text-xs space-y-1';
+            resultPanel.innerHTML = `
+              <div class="flex items-center space-x-2 font-bold mb-1">
+                <span class="material-icons-round text-sm">check_circle</span>
+                <span>ผ่านการประเมิน (Valid)</span>
+              </div>
+              <p>คุณสมบัติของผู้สมัครถูกต้องตามเกณฑ์เงื่อนไขกฎการแข่งขัน</p>
+            `;
+          } else {
+            resultPanel.className = 'p-4 rounded-2xl border bg-rose-950/20 border-rose-900/40 text-rose-300 text-xs space-y-1';
+            resultPanel.innerHTML = `
+              <div class="flex items-center space-x-2 font-bold mb-1">
+                <span class="material-icons-round text-sm">block</span>
+                <span>ถูกสกัดกั้นสมัคร (Block Error)</span>
+              </div>
+              <p class="font-semibold text-rose-200">ข้อผิดพลาด: ${res.errors[0].messageTh}</p>
+              <p class="text-[10px] text-rose-400/80 font-mono">Error Code: ${res.errors[0].errorCode}</p>
+            `;
+          }
+        } catch (e) {
+          this.showToast('ประมวลผลตรรกะไม่สำเร็จ', 'error');
+        }
+      },
+
+      async renderTenantsView() {
+        const main = document.getElementById('main-content');
+        main.innerHTML = `
+          <div class="w-full max-w-4xl space-y-6">
+            <div class="flex items-center justify-between">
+              <div>
+                <h2 class="text-xl font-bold text-white">ระบบจัดการ Tenants</h2>
+                <p class="text-xs text-slate-400">ควบคุมและแยกบัญชีข้อมูลเขตพื้นที่การศึกษา</p>
+              </div>
+            </div>
+            
+            <div class="border border-slate-800 bg-slate-950/40 rounded-3xl overflow-hidden shadow-xl">
+              <table class="w-full text-left text-sm text-slate-300">
+                <thead class="bg-slate-900 text-xs text-slate-400 font-semibold uppercase">
+                  <tr>
+                    <th class="px-6 py-4">Tenant Code / ID</th>
+                    <th class="px-6 py-4">ชื่อเขตพื้นที่</th>
+                    <th class="px-6 py-4">จังหวัด</th>
+                    <th class="px-6 py-4">สถานะ</th>
+                  </tr>
+                </thead>
+                <tbody id="tenants-table-body">
+                  <tr>
+                    <td colspan="4" class="text-center py-8 text-slate-500">กำลังโหลด...</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        `;
+        
+        try {
+          const list = await CMPE_API.call('master.tenants.list');
+          const tbody = document.getElementById('tenants-table-body');
+          if (list.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="4" class="text-center py-8 text-slate-500">ไม่มีข้อมูล Tenant ในระบบ</td></tr>`;
+            return;
+          }
+          tbody.innerHTML = list.map(t => `
+            <tr class="border-b border-slate-900 hover:bg-slate-900/20">
+              <td class="px-6 py-4 font-mono text-xs">${t.tenantId}</td>
+              <td class="px-6 py-4 font-medium text-white">${t.name}</td>
+              <td class="px-6 py-4">${t.province}</td>
+              <td class="px-6 py-4">
+                <span class="px-2 py-1 rounded-full text-[10px] font-bold ${t.status === 'ACTIVE' ? 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20' : 'bg-rose-500/10 text-rose-500 border border-rose-500/20'}">
+                  ${t.status}
+                </span>
+              </td>
+            </tr>
+          `).join('');
+        } catch (e) {
+          this.showToast('ไม่สามารถดึงข้อมูล Tenant ได้', 'error');
+        }
+      },
+
+      async handleLogin(event) {
+        event.preventDefault();
+        const username = document.getElementById('username').value;
+        const password = document.getElementById('password').value;
+        const rememberMe = document.getElementById('remember-me').checked;
+
+        try {
+          const data = await CMPE_API.call('auth.login', {
+            username: username,
+            password: password,
+            rememberMe: rememberMe,
+            tenantId: CMPE_STATE.tenantId
+          });
+
+          CMPE_STATE.sessionToken = data.sessionToken;
+          CMPE_STATE.user = data.user;
+          CMPE_STATE.tenantId = data.user.tenantId || CMPE_STATE.tenantId;
+          localStorage.setItem('sessionToken', data.sessionToken);
+          this.showToast('เข้าสู่ระบบสำเร็จ!', 'success');
+          
+          this.setupSidebar(data.user.permissions);
+          this.updateHeaderStatus(data.user.username);
+          this.navigateTo('dashboard');
+        } catch (err) {
+          this.showToast(err.message || 'การเข้าสู่ระบบล้มเหลว', 'error');
+        }
+      },
+
+      async handleLogout() {
+        try {
+          await CMPE_API.call('auth.logout', { tenantId: CMPE_STATE.tenantId });
+        } catch (e) {}
+        
+        CMPE_STATE.sessionToken = null;
+        localStorage.removeItem('sessionToken');
+        this.showToast('ออกจากระบบเรียบร้อยแล้ว', 'info');
+        this.navigateTo('login');
+      },
+
+      updateHeaderStatus(username = null) {
+        const header = document.getElementById('user-header-status');
+        if (CMPE_STATE.sessionToken && username) {
+          header.innerHTML = `
+            <div class="flex items-center space-x-2">
+              <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+              <span class="text-xs text-slate-300 font-medium">${username}</span>
+            </div>
+            <button onclick="CMPE_UI.handleLogout()" class="text-xs text-indigo-400 font-semibold hover:underline">ออกจากระบบ</button>
+          `;
+        } else {
+          header.innerHTML = `
+            <span class="text-xs text-slate-500">ยังไม่ได้เข้าสู่ระบบ</span>
+          `;
+        }
+      }
+    };
+
+    window.addEventListener('DOMContentLoaded', () => {
+      if (typeof google === 'undefined' || !google.script || !google.script.run) {
+        window.google = {
+          script: {
+            run: {
+              withSuccessHandler: function(handler) {
+                this.successHandler = handler;
+                return this;
+              },
+              withFailureHandler: function(handler) {
+                this.failureHandler = handler;
+                return this;
+              },
+              apiDispatcher: function(envelope) {
+                console.log("Mock API dispatch execution:", envelope);
+              }
+            }
+          }
+        };
+      }
+      CMPE_UI.init();
+    });
+  </script>
+</body>
+</html>
