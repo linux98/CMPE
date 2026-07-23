@@ -1994,16 +1994,36 @@
       async renderRegistrationsReviewQueue() {
         const main = document.getElementById('main-content');
         main.innerHTML = `
-          <div class="w-full max-w-4xl space-y-6">
-            <div>
-              <h2 class="text-xl font-bold text-white">ตรวจสอบคำขอใบสมัครการแข่งขัน</h2>
-              <p class="text-xs text-slate-400">กล่องคำขอสมัครแข่งขันของเขตพื้นที่การศึกษา</p>
+          <div class="w-full max-w-6xl space-y-5">
+            <div class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+              <div>
+                <h2 class="text-xl font-bold text-white">ตรวจสอบคำขอใบสมัครการแข่งขัน</h2>
+                <p class="mt-1 text-xs text-slate-400">ค้นหา ตรวจสอบ และอนุมัติใบสมัครของโรงเรียนในเขตพื้นที่</p>
+              </div>
+              <button id="bulk-approve-button" onclick="CMPE_UI.bulkApproveReviews()" disabled class="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-30">
+                <span class="material-icons-round text-base">done_all</span>
+                <span id="bulk-approve-label">อนุมัติที่เลือก</span>
+              </button>
             </div>
-            
+
+            <div class="grid gap-3 sm:grid-cols-3">
+              <div class="rounded-2xl border border-amber-900/30 bg-amber-950/10 p-4"><p class="text-[10px] uppercase tracking-wider text-amber-500">รอตรวจทั้งหมด</p><p id="review-total-count" class="mt-1 text-2xl font-bold text-white">—</p></div>
+              <div class="rounded-2xl border border-slate-800 bg-slate-900/30 p-4"><p class="text-[10px] uppercase tracking-wider text-slate-500">โรงเรียนที่ส่ง</p><p id="review-school-count" class="mt-1 text-2xl font-bold text-white">—</p></div>
+              <div class="rounded-2xl border border-slate-800 bg-slate-900/30 p-4"><p class="text-[10px] uppercase tracking-wider text-slate-500">หมวดกิจกรรม</p><p id="review-activity-count" class="mt-1 text-2xl font-bold text-white">—</p></div>
+            </div>
+
+            <div class="grid gap-3 rounded-2xl border border-slate-800 bg-slate-900/30 p-4 lg:grid-cols-[1fr_15rem_15rem_12rem]">
+              <label class="relative"><span class="material-icons-round absolute left-3 top-2.5 text-lg text-slate-500">search</span><input id="review-search" oninput="CMPE_UI.filterReviewRows()" type="search" placeholder="ค้นหาเลขใบสมัคร โรงเรียน หรือกิจกรรม" class="w-full rounded-xl border border-slate-800 bg-slate-950/60 py-2.5 pl-10 pr-4 text-xs text-white outline-none focus:border-indigo-500" /></label>
+              <select id="review-school-filter" onchange="CMPE_UI.filterReviewRows()" class="rounded-xl border border-slate-800 bg-slate-950/60 px-3 py-2.5 text-xs text-slate-300"><option value="">ทุกโรงเรียน</option></select>
+              <select id="review-activity-filter" onchange="CMPE_UI.filterReviewRows()" class="rounded-xl border border-slate-800 bg-slate-950/60 px-3 py-2.5 text-xs text-slate-300"><option value="">ทุกกิจกรรม</option></select>
+              <select id="review-sort" onchange="CMPE_UI.filterReviewRows()" class="rounded-xl border border-slate-800 bg-slate-950/60 px-3 py-2.5 text-xs text-slate-300"><option value="number-asc">เลขใบสมัคร</option><option value="school-asc">โรงเรียน ก–ฮ</option><option value="activity-asc">กิจกรรม ก–ฮ</option></select>
+            </div>
+
             <div class="border border-slate-800 bg-slate-950/40 rounded-3xl overflow-hidden shadow-xl">
               <table class="w-full text-left text-sm text-slate-300">
                 <thead class="bg-slate-900 text-xs text-slate-400 font-semibold uppercase">
                   <tr>
+                    <th class="w-12 px-4 py-4"><input id="review-select-all" onchange="CMPE_UI.toggleAllVisibleReviews(this.checked)" type="checkbox" class="rounded border-slate-700 bg-slate-950" /></th>
                     <th class="px-6 py-4">ใบสมัคร</th>
                     <th class="px-6 py-4">โรงเรียนผู้ส่ง</th>
                     <th class="px-6 py-4">สถานะ</th>
@@ -2012,7 +2032,7 @@
                 </thead>
                 <tbody id="reviews-table-body">
                   <tr>
-                    <td colspan="4" class="text-center py-8 text-slate-500">กำลังโหลดกล่องข้อความ...</td>
+                    <td colspan="5" class="text-center py-10 text-slate-500">กำลังโหลดกล่องตรวจสอบ...</td>
                   </tr>
                 </tbody>
               </table>
@@ -2022,44 +2042,149 @@
 
         try {
           const list = await CMPE_API.call('registration.list', {});
-          const tbody = document.getElementById('reviews-table-body');
-          const submissions = list.filter(r => r.registrationStatus === "SUBMITTED");
-          
-          if (submissions.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="4" class="text-center py-8 text-slate-500">ไม่มีใบสมัครที่รอดำเนินการตรวจสอบ</td></tr>`;
-            return;
-          }
-          
-          tbody.innerHTML = submissions.map(r => `
-            <tr class="border-b border-slate-900 hover:bg-slate-900/20">
-              <td class="px-6 py-4">
-                <p class="font-semibold text-white">${this.escapeHtml(r.registrationDisplay)}</p>
-                <p class="mt-1 text-[10px] text-slate-500">${this.escapeHtml(r.activityNameTh)}</p>
-              </td>
-              <td class="px-6 py-4 font-medium text-white">${this.escapeHtml(r.schoolNameTh)}</td>
-              <td class="px-6 py-4">
-                <span class="px-2 py-1 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20">
-                  ${this.escapeHtml(r.statusLabelTh)}
-                </span>
-              </td>
-              <td class="px-6 py-4 text-right space-x-2">
-                <button onclick="CMPE_UI.handleApprove('${r.registrationId}', ${r.rowVersion})" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-semibold transition">อนุมัติ</button>
-                <button onclick="CMPE_UI.openRejectModal('${r.registrationId}', ${r.rowVersion})" class="px-3 py-1.5 bg-rose-600 hover:bg-rose-500 text-white rounded-xl text-xs font-semibold transition">ปฏิเสธ</button>
-              </td>
-            </tr>
-          `).join('');
+          this.reviewQueueCache = (Array.isArray(list) ? list : []).filter(r => r.registrationStatus === 'SUBMITTED');
+          this.reviewSelectedIds = new Set();
+          this.reviewCurrentPage = 1;
+          const schools = [...new Set(this.reviewQueueCache.map(r => r.schoolNameTh).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'th'));
+          const activities = [...new Set(this.reviewQueueCache.map(r => r.activityNameTh).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'th'));
+          document.getElementById('review-school-filter').innerHTML += schools.map(value => `<option value="${this.escapeHtml(value)}">${this.escapeHtml(value)}</option>`).join('');
+          document.getElementById('review-activity-filter').innerHTML += activities.map(value => `<option value="${this.escapeHtml(value)}">${this.escapeHtml(value)}</option>`).join('');
+          document.getElementById('review-total-count').textContent = this.reviewQueueCache.length.toLocaleString('th-TH');
+          document.getElementById('review-school-count').textContent = schools.length.toLocaleString('th-TH');
+          document.getElementById('review-activity-count').textContent = activities.length.toLocaleString('th-TH');
+          this.filterReviewRows();
         } catch (e) {
-          this.showToast('โหลดคิวไม่สำเร็จ', 'error');
+          document.getElementById('reviews-table-body').innerHTML = `<tr><td colspan="5" class="py-12 text-center text-rose-300"><span class="material-icons-round text-3xl">cloud_off</span><p class="mt-2">โหลดคิวตรวจสอบไม่สำเร็จ</p><p class="mt-1 font-mono text-[10px]">${this.escapeHtml(e.message || String(e))}</p></td></tr>`;
+          this.showToast(e.message || 'โหลดคิวไม่สำเร็จ', 'error');
         }
       },
 
-      async handleApprove(regId, rowVer) {
+      filterReviewRows() {
+        const query = (document.getElementById('review-search')?.value || '').trim().toLowerCase();
+        const school = document.getElementById('review-school-filter')?.value || '';
+        const activity = document.getElementById('review-activity-filter')?.value || '';
+        const sort = document.getElementById('review-sort')?.value || 'number-asc';
+        let list = (this.reviewQueueCache || []).filter(item => {
+          const searchable = [item.registrationNumber, item.registrationDisplay, item.schoolNameTh, item.activityNameTh].join(' ').toLowerCase();
+          return (!query || searchable.includes(query)) &&
+            (!school || item.schoolNameTh === school) &&
+            (!activity || item.activityNameTh === activity);
+        });
+        list.sort((a, b) => {
+          if (sort === 'school-asc') return String(a.schoolNameTh || '').localeCompare(String(b.schoolNameTh || ''), 'th');
+          if (sort === 'activity-asc') return String(a.activityNameTh || '').localeCompare(String(b.activityNameTh || ''), 'th');
+          return String(a.registrationNumber || '').localeCompare(String(b.registrationNumber || ''), 'th', { numeric: true });
+        });
+        this.reviewFilteredCache = list;
+        this.reviewCurrentPage = Math.min(this.reviewCurrentPage || 1, Math.max(1, Math.ceil(list.length / 15)));
+        this.renderReviewRows(list);
+      },
+
+      renderReviewRows(list) {
+        const tbody = document.getElementById('reviews-table-body');
+        if (!tbody) return;
+        const pageSize = 15;
+        const pages = Math.max(1, Math.ceil(list.length / pageSize));
+        const rows = list.slice((this.reviewCurrentPage - 1) * pageSize, this.reviewCurrentPage * pageSize);
+        this.reviewVisibleIds = rows.map(item => item.registrationId);
+        if (!rows.length) {
+          tbody.innerHTML = `<tr><td colspan="5" class="py-14 text-center text-slate-500"><span class="material-icons-round text-4xl text-slate-700">inbox</span><p class="mt-2">ไม่พบใบสมัครที่รอตรวจตามเงื่อนไข</p></td></tr>`;
+          return;
+        }
+        tbody.innerHTML = rows.map(r => `
+          <tr id="review-row-${this.escapeHtml(r.registrationId)}" class="border-b border-slate-900 transition hover:bg-slate-900/30">
+            <td class="px-4 py-4"><input type="checkbox" ${this.reviewSelectedIds?.has(r.registrationId) ? 'checked' : ''} onchange="CMPE_UI.toggleReviewSelection('${this.escapeHtml(r.registrationId)}', this.checked)" class="rounded border-slate-700 bg-slate-950" /></td>
+            <td class="px-6 py-4"><p class="font-semibold text-white">${this.escapeHtml(r.registrationDisplay)}</p><p class="mt-1 text-[10px] text-slate-500">${this.escapeHtml(r.activityNameTh)} · ${this.escapeHtml(r.educationLevelNameTh)}</p></td>
+            <td class="px-6 py-4 font-medium text-white">${this.escapeHtml(r.schoolNameTh)}</td>
+            <td class="px-6 py-4"><span class="rounded-full border border-amber-500/20 bg-amber-500/10 px-2 py-1 text-[10px] font-bold text-amber-400">${this.escapeHtml(r.statusLabelTh)}</span></td>
+            <td class="px-6 py-4 text-right"><button onclick="CMPE_UI.handleApprove('${this.escapeHtml(r.registrationId)}', ${r.rowVersion}, this)" class="rounded-xl bg-emerald-600 px-3 py-2 text-xs font-semibold text-white hover:bg-emerald-500">อนุมัติ</button><button onclick="CMPE_UI.openRejectModal('${this.escapeHtml(r.registrationId)}', ${r.rowVersion})" class="ml-2 rounded-xl bg-rose-600 px-3 py-2 text-xs font-semibold text-white hover:bg-rose-500">ปฏิเสธ</button></td>
+          </tr>`).join('') + (pages > 1 ? `<tr><td colspan="5" class="px-5 py-4"><div class="flex items-center justify-between"><button onclick="CMPE_UI.changeReviewPage(-1)" ${this.reviewCurrentPage === 1 ? 'disabled' : ''} class="rounded-lg border border-slate-700 px-3 py-2 text-xs disabled:opacity-30">ก่อนหน้า</button><span class="text-xs text-slate-500">หน้า ${this.reviewCurrentPage}/${pages} · ${list.length} รายการ</span><button onclick="CMPE_UI.changeReviewPage(1)" ${this.reviewCurrentPage === pages ? 'disabled' : ''} class="rounded-lg border border-slate-700 px-3 py-2 text-xs disabled:opacity-30">ถัดไป</button></div></td></tr>` : '');
+        const selectAll = document.getElementById('review-select-all');
+        if (selectAll) selectAll.checked = rows.length > 0 && rows.every(item => this.reviewSelectedIds?.has(item.registrationId));
+        this.updateReviewBulkButton();
+      },
+
+      changeReviewPage(delta) {
+        this.reviewCurrentPage = Math.max(1, (this.reviewCurrentPage || 1) + delta);
+        this.renderReviewRows(this.reviewFilteredCache || []);
+      },
+
+      toggleReviewSelection(registrationId, checked) {
+        if (!this.reviewSelectedIds) this.reviewSelectedIds = new Set();
+        checked ? this.reviewSelectedIds.add(registrationId) : this.reviewSelectedIds.delete(registrationId);
+        this.updateReviewBulkButton();
+      },
+
+      toggleAllVisibleReviews(checked) {
+        if (!this.reviewSelectedIds) this.reviewSelectedIds = new Set();
+        (this.reviewVisibleIds || []).forEach(id => checked ? this.reviewSelectedIds.add(id) : this.reviewSelectedIds.delete(id));
+        this.renderReviewRows(this.reviewFilteredCache || []);
+      },
+
+      updateReviewBulkButton() {
+        const count = this.reviewSelectedIds?.size || 0;
+        const button = document.getElementById('bulk-approve-button');
+        const label = document.getElementById('bulk-approve-label');
+        if (button) button.disabled = count === 0 || count > 25;
+        if (label) label.textContent = count > 25
+          ? `เลือกได้สูงสุด 25 รายการ (เลือก ${count})`
+          : (count ? `อนุมัติที่เลือก ${count} รายการ` : 'อนุมัติที่เลือก');
+      },
+
+      removeReviewedRows(registrationIds) {
+        const removed = new Set(registrationIds);
+        this.reviewQueueCache = (this.reviewQueueCache || []).filter(item => !removed.has(item.registrationId));
+        removed.forEach(id => this.reviewSelectedIds?.delete(id));
+        const schools = new Set(this.reviewQueueCache.map(item => item.schoolNameTh));
+        const activities = new Set(this.reviewQueueCache.map(item => item.activityNameTh));
+        const total = document.getElementById('review-total-count');
+        const schoolCount = document.getElementById('review-school-count');
+        const activityCount = document.getElementById('review-activity-count');
+        if (total) total.textContent = this.reviewQueueCache.length.toLocaleString('th-TH');
+        if (schoolCount) schoolCount.textContent = schools.size.toLocaleString('th-TH');
+        if (activityCount) activityCount.textContent = activities.size.toLocaleString('th-TH');
+        this.filterReviewRows();
+      },
+
+      async handleApprove(regId, rowVer, button) {
+        const originalLabel = button?.innerHTML;
+        if (button) {
+          button.disabled = true;
+          button.innerHTML = '<span class="inline-block h-3 w-3 animate-spin rounded-full border-2 border-white/30 border-t-white"></span>';
+        }
         try {
           await CMPE_API.call('registration.approve', { registrationId: regId, rowVersion: rowVer });
           this.showToast('อนุมัติการสมัครสำเร็จ!', 'success');
-          this.renderRegistrationsReviewQueue();
+          this.removeReviewedRows([regId]);
         } catch (e) {
-          this.showToast('การดำเนินการอนุมัติล้มเหลว', 'error');
+          if (button) {
+            button.disabled = false;
+            button.innerHTML = originalLabel;
+          }
+          this.showToast(e.message || 'การดำเนินการอนุมัติล้มเหลว', 'error');
+        }
+      },
+
+      async bulkApproveReviews() {
+        const selected = [...(this.reviewSelectedIds || [])];
+        if (!selected.length || !confirm(`ยืนยันอนุมัติใบสมัคร ${selected.length} รายการหรือไม่?`)) return;
+        const button = document.getElementById('bulk-approve-button');
+        const items = selected.map(id => {
+          const item = (this.reviewQueueCache || []).find(row => row.registrationId === id);
+          return { registrationId: id, rowVersion: item?.rowVersion };
+        });
+        if (button) {
+          button.disabled = true;
+          button.innerHTML = '<span class="inline-block h-3 w-3 animate-spin rounded-full border-2 border-white/30 border-t-white"></span><span>กำลังอนุมัติ...</span>';
+        }
+        try {
+          const result = await CMPE_API.call('registration.review.bulkApprove', { items });
+          this.removeReviewedRows(selected);
+          this.showToast(`อนุมัติสำเร็จ ${result.approvedCount} รายการ`, 'success');
+        } catch (e) {
+          this.updateReviewBulkButton();
+          if (button) button.innerHTML = `<span class="material-icons-round text-base">done_all</span><span id="bulk-approve-label">อนุมัติที่เลือก ${selected.length} รายการ</span>`;
+          this.showToast(e.message || 'อนุมัติแบบกลุ่มไม่สำเร็จ', 'error');
         }
       },
 
@@ -2097,9 +2222,9 @@
           });
           this.showToast('ปฏิเสธการสมัครและส่งคืนใบสมัครแล้ว!', 'success');
           document.getElementById('reject-modal').remove();
-          this.renderRegistrationsReviewQueue();
+          this.removeReviewedRows([regId]);
         } catch (e) {
-          this.showToast('การดำเนินการล้มเหลว', 'error');
+          this.showToast(e.message || 'การดำเนินการล้มเหลว', 'error');
         }
       },
 

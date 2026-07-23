@@ -1120,9 +1120,12 @@ function apiDispatcher(requestEnvelope) {
       if (action === "registration.list") {
         const requestedSchoolId = payload.schoolId || actor.schoolId;
         const canReadTenant = actor.permissions.indexOf("registration.readTenant") !== -1;
-        const list = requestedSchoolId
-          ? regRepo.findBySchool(requestedSchoolId, tenantId)
-          : (canReadTenant ? regRepo.findAll(tenantId) : []);
+        const scopeKey = requestedSchoolId || (canReadTenant ? "TENANT" : "NONE");
+        const list = cachedCatalogRead_("registration.list:" + scopeKey, tenantId, function() {
+          return requestedSchoolId
+            ? regRepo.findBySchool(requestedSchoolId, tenantId)
+            : (canReadTenant ? regRepo.findAll(tenantId) : []);
+        }, 30);
         const lookup = getRegistrationDisplayLookup_();
         const statusLabels = {
           DRAFT: "ฉบับร่าง",
@@ -1185,6 +1188,16 @@ function apiDispatcher(requestEnvelope) {
         }
         const approved = reviewSvc.approveRegistration(payload.registrationId, payload.rowVersion, actor);
         return CMPE_UTILITIES.successEnvelope(approved, reqId);
+      }
+      if (action === "registration.review.bulkApprove") {
+        if (actor.permissions.indexOf("registration.approve") === -1) {
+          return CMPE_UTILITIES.errorEnvelope("ERR_UNAUTHORIZED", "Missing registration.approve permission", [], reqId);
+        }
+        const approved = reviewSvc.bulkApprove(payload.items || [], actor);
+        return CMPE_UTILITIES.successEnvelope({
+          approvedCount: approved.length,
+          registrations: approved
+        }, reqId);
       }
       if (action === "registration.reject") {
         if (actor.permissions.indexOf("registration.reject") === -1) {

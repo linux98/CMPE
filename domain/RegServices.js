@@ -217,58 +217,29 @@ class RegistrationReviewService {
   }
 
   approveRegistration(registrationId, expectedRowVersion, actor) {
-    const regRow = this.regRepo.findById(registrationId, actor.tenantId);
-    if (!regRow) throw new Error("ERR_REG_NOT_FOUND");
-    
-    const reg = new RegistrationEntity(regRow);
-    if (reg.registrationStatus !== "SUBMITTED") {
-      throw new Error("ERR_STATE_VIOLATION: Only SUBMITTED registrations can be approved.");
-    }
-    
-    reg.registrationStatus = "APPROVED";
-    reg.approvalTimestamp = new Date().toISOString();
-    reg.approvedBy = actor.userId;
-    
-    this.regRepo.update(reg, expectedRowVersion, actor);
-    
-    const hist = new RegistrationHistoryEntryEntity({
-      registrationHistoryId: CMPE_UTILITIES.generateUuid(),
-      registrationId: registrationId,
-      actionType: "APPROVED",
-      changeLogJson: JSON.stringify({ approvedBy: actor.userId }),
-      tenantId: actor.tenantId
-    });
-    this.historyRepo.create(hist, actor);
-    return reg;
+    return this.regRepo.reviewTransitions(
+      [{ registrationId: registrationId, rowVersion: expectedRowVersion }],
+      "APPROVED",
+      "",
+      actor
+    )[0];
   }
 
   rejectRegistration(registrationId, reason, expectedRowVersion, actor) {
     if (!reason) throw new Error("ERR_REJECTION_REASON_REQUIRED");
-    
-    const regRow = this.regRepo.findById(registrationId, actor.tenantId);
-    if (!regRow) throw new Error("ERR_REG_NOT_FOUND");
-    
-    const reg = new RegistrationEntity(regRow);
-    if (reg.registrationStatus !== "SUBMITTED") {
-      throw new Error("ERR_STATE_VIOLATION");
+    return this.regRepo.reviewTransitions(
+      [{ registrationId: registrationId, rowVersion: expectedRowVersion }],
+      "REJECTED",
+      reason,
+      actor
+    )[0];
+  }
+
+  bulkApprove(items, actor) {
+    if (!items || !items.length || items.length > 25) {
+      throw new Error("ERR_BATCH_SIZE: Select between 1 and 25 registrations.");
     }
-    
-    reg.registrationStatus = "REJECTED";
-    reg.rejectionTimestamp = new Date().toISOString();
-    reg.rejectedBy = actor.userId;
-    reg.rejectionReason = reason;
-    
-    this.regRepo.update(reg, expectedRowVersion, actor);
-    
-    const hist = new RegistrationHistoryEntryEntity({
-      registrationHistoryId: CMPE_UTILITIES.generateUuid(),
-      registrationId: registrationId,
-      actionType: "REJECTED",
-      changeLogJson: JSON.stringify({ reason }),
-      tenantId: actor.tenantId
-    });
-    this.historyRepo.create(hist, actor);
-    return reg;
+    return this.regRepo.reviewTransitions(items, "APPROVED", "", actor);
   }
 }
 
