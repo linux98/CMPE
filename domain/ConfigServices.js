@@ -54,7 +54,7 @@ class CompetitionApplicationService {
     rounds.forEach(r => {
       const cloneRound = new CompetitionRoundEntity({
         ...r,
-        roundId: CMPE_UTILITIES.generateUuid(),
+        competitionRoundId: CMPE_UTILITIES.generateUuid(),
         competitionId: cloneCompId,
         rowVersion: 1
       });
@@ -67,14 +67,14 @@ class CompetitionApplicationService {
       const cloneConfigId = CMPE_UTILITIES.generateUuid();
       const cloneConfig = new CompetitionCategoryConfigEntity({
         ...c,
-        configId: cloneConfigId,
+        competitionCategoryConfigId: cloneConfigId,
         competitionId: cloneCompId,
         rowVersion: 1
       });
       this.categoryConfigRepo.create(cloneConfig, actor);
       
       // Clone Category Rules linked to this config
-      const rules = this.ruleRepo.findByConfig(c.configId);
+      const rules = this.ruleRepo.findByConfig(c.competitionCategoryConfigId || c.configId);
       rules.forEach(rule => {
         const cloneRule = new CategoryRuleEntity({
           ...rule,
@@ -222,7 +222,8 @@ class ScoreTemplateApplicationService {
 
   addCriterion(payload, actor) {
     const crit = new ScoreCriterionEntity(payload);
-    crit.criterionId = payload.criterionId || CMPE_UTILITIES.generateUuid();
+    crit.scoreCriterionId =
+      payload.scoreCriterionId || payload.criterionId || CMPE_UTILITIES.generateUuid();
     return this.criteriaRepo.create(crit, actor);
   }
 

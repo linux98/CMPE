@@ -184,7 +184,8 @@ class BaseRepository {
       
       // Inject standard creation metadata
       if (this.isMutable) {
-        if (headerMap["tenantId"] && actorContext && actorContext.tenantId) {
+        if (this.sheetName !== "tenants" &&
+            headerMap["tenantId"] && actorContext && actorContext.tenantId) {
           entity.tenantId = actorContext.tenantId;
         }
         entity.createdTimestamp = new Date().toISOString();
@@ -232,7 +233,8 @@ class BaseRepository {
       
       for (let i = 0; i < data.length; i++) {
         if (data[i][pkColIdx] === id) {
-          if (tenantColIdx !== -1 && actorContext && actorContext.tenantId &&
+          if (this.sheetName !== "tenants" &&
+              tenantColIdx !== -1 && actorContext && actorContext.tenantId &&
               data[i][tenantColIdx] !== actorContext.tenantId) {
             throw new Error("ERR_TENANT_ISOLATION_VIOLATION: Update boundary breach blocked.");
           }

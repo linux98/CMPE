@@ -16,7 +16,12 @@ class TenantService {
   }
 
   updateTenant(payload, expectedRowVersion, actor) {
-    const tenant = new TenantEntity(payload);
+    const current = this.tenantRepo.findById(payload.tenantId, null);
+    if (!current) throw new Error("ERR_TENANT_NOT_FOUND");
+    const tenant = new TenantEntity(Object.assign({}, current, payload, {
+      // Never accept a password hash from the browser. Preserve the server value.
+      adminPasswordHash: current.adminPasswordHash
+    }));
     return this.tenantRepo.update(tenant, expectedRowVersion, actor);
   }
 

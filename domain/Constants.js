@@ -42,7 +42,7 @@ const CMPE_CONSTANTS = {
   // super administrators receive this catalog as an explicit wildcard while
   // granular roles continue to use role_permissions from the database.
   AllPermissions: [
-    "tenant.read", "tenant.create",
+    "tenant.read", "tenant.create", "tenant.update", "tenant.transition",
     "academicYear.read", "academicYear.setCurrent",
     "province.read", "district.read",
     "school.read", "school.create", "school.import",

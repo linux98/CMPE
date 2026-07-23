@@ -53,7 +53,7 @@ class CompetitionEntity {
 
 class CompetitionRoundEntity {
   constructor(data) {
-    this.roundId = data.roundId || "";
+    this.competitionRoundId = data.competitionRoundId || data.roundId || "";
     this.competitionId = data.competitionId || "";
     this.roundSequence = parseInt(data.roundSequence) || 1;
     this.nameTh = data.nameTh || "";
@@ -73,7 +73,8 @@ class CompetitionRoundEntity {
 
 class CompetitionCategoryConfigEntity {
   constructor(data) {
-    this.configId = data.configId || "";
+    this.competitionCategoryConfigId =
+      data.competitionCategoryConfigId || data.configId || "";
     this.competitionId = data.competitionId || "";
     this.categoryId = data.categoryId || "";
     this.educationLevelId = data.educationLevelId || "";
@@ -150,7 +151,7 @@ class ScoreTemplateEntity {
 
 class ScoreCriterionEntity {
   constructor(data) {
-    this.criterionId = data.criterionId || "";
+    this.scoreCriterionId = data.scoreCriterionId || data.criterionId || "";
     this.scoreTemplateId = data.scoreTemplateId || "";
     this.criterionCode = data.criterionCode || "";
     this.nameTh = data.nameTh || "";

@@ -708,6 +708,22 @@
           `;
         }
 
+        if (permissions.includes('academicYear.read')) {
+          navHtml += `<a href="#years" class="flex items-center space-x-3 px-3 py-2.5 rounded-xl text-sm font-medium text-slate-300 hover:bg-slate-900 hover:text-white transition"><span class="material-icons-round text-slate-500">calendar_month</span><span>ปีการศึกษา</span></a>`;
+        }
+        if (permissions.includes('school.read')) {
+          navHtml += `<a href="#schools" class="flex items-center space-x-3 px-3 py-2.5 rounded-xl text-sm font-medium text-slate-300 hover:bg-slate-900 hover:text-white transition"><span class="material-icons-round text-slate-500">school</span><span>ข้อมูลโรงเรียน</span></a>`;
+        }
+        if (permissions.includes('educationLevel.read')) {
+          navHtml += `<a href="#levels" class="flex items-center space-x-3 px-3 py-2.5 rounded-xl text-sm font-medium text-slate-300 hover:bg-slate-900 hover:text-white transition"><span class="material-icons-round text-slate-500">stairs</span><span>ระดับการศึกษา</span></a>`;
+        }
+        if (permissions.includes('competitionCategory.read')) {
+          navHtml += `<a href="#categories" class="flex items-center space-x-3 px-3 py-2.5 rounded-xl text-sm font-medium text-slate-300 hover:bg-slate-900 hover:text-white transition"><span class="material-icons-round text-slate-500">category</span><span>หมวดหมู่กิจกรรม</span></a>`;
+        }
+        if (permissions.includes('venue.read')) {
+          navHtml += `<a href="#venues" class="flex items-center space-x-3 px-3 py-2.5 rounded-xl text-sm font-medium text-slate-300 hover:bg-slate-900 hover:text-white transition"><span class="material-icons-round text-slate-500">location_on</span><span>สนามแข่งขัน</span></a>`;
+        }
+
         if (permissions.includes('tenant.read')) {
           navHtml += `
             <a href="#tenants" class="flex items-center space-x-3 px-3 py-2.5 rounded-xl text-sm font-medium text-slate-300 hover:bg-slate-900 hover:text-white transition">
@@ -718,6 +734,98 @@
         }
 
         nav.innerHTML = navHtml;
+      },
+
+      renderYearsView() {
+        return this.renderMasterDataView({
+          title: 'ปีการศึกษา', description: 'กำหนดปีการศึกษาปัจจุบันที่ใช้อ้างอิงทั่วทั้งระบบ',
+          action: 'master.academicYears.list', idKey: 'academicYearId',
+          columns: [{ key: 'yearValue', label: 'ปีการศึกษา' }, { key: 'status', label: 'สถานะ' }, { key: 'isCurrent', label: 'การใช้งาน', format: v => v ? 'ปีปัจจุบัน' : 'ไม่ได้เลือก' }],
+          rowAction: item => item.isCurrent ? '<span class="text-xs text-emerald-400">กำลังใช้งาน</span>' : `<button onclick="CMPE_UI.setCurrentAcademicYear('${this.escapeHtml(item.academicYearId)}')" class="rounded-lg bg-indigo-600 px-3 py-2 text-xs text-white">ตั้งเป็นปีปัจจุบัน</button>`
+        });
+      },
+
+      renderSchoolsView() {
+        return this.renderMasterDataView({
+          title: 'ข้อมูลโรงเรียน', description: 'โรงเรียนภายในขอบเขตเขตพื้นที่ของผู้ใช้งาน',
+          action: 'master.schools.list', payload: { query: '' }, idKey: 'schoolId',
+          columns: [{ key: 'nameTh', label: 'ชื่อโรงเรียน' }, { key: 'nameEn', label: 'ชื่อภาษาอังกฤษ' }, { key: 'districtId', label: 'เครือข่าย/อำเภอ' }]
+        });
+      },
+
+      renderLevelsView() {
+        return this.renderMasterDataView({
+          title: 'ระดับการศึกษา', description: 'ข้อมูลอ้างอิงระดับชั้นที่ใช้กับหมวดหมู่และผู้สมัคร',
+          action: 'master.educationLevels.list', idKey: 'educationLevelId',
+          columns: [{ key: 'levelCode', label: 'รหัสระดับ' }, { key: 'nameTh', label: 'ชื่อภาษาไทย' }, { key: 'nameEn', label: 'ชื่อภาษาอังกฤษ' }]
+        });
+      },
+
+      renderCategoriesView() {
+        return this.renderMasterDataView({
+          title: 'หมวดหมู่กิจกรรม', description: 'คลังหมวดหมู่กลางสำหรับเชื่อมกับการแข่งขันรายปี',
+          action: 'master.categories.list', idKey: 'categoryId',
+          columns: [{ key: 'categoryCode', label: 'รหัสหมวด' }, { key: 'nameTh', label: 'ชื่อกิจกรรม' }, { key: 'nameEn', label: 'ชื่อภาษาอังกฤษ' }]
+        });
+      },
+
+      renderVenuesView() {
+        return this.renderMasterDataView({
+          title: 'สนามแข่งขัน', description: 'สถานที่และข้อมูลอ้างอิงสำหรับจัดห้องและตารางการแข่งขัน',
+          action: 'master.venues.list', idKey: 'venueId',
+          columns: [{ key: 'name', label: 'ชื่อสนาม' }, { key: 'address', label: 'ที่อยู่' }, { key: 'districtId', label: 'พื้นที่' }]
+        });
+      },
+
+      async renderMasterDataView(config) {
+        this.masterViewConfig = config;
+        const main = document.getElementById('main-content');
+        main.innerHTML = `<div class="w-full max-w-6xl space-y-6"><div><h2 class="text-xl font-bold text-white">${this.escapeHtml(config.title)}</h2><p class="mt-1 text-xs text-slate-400">${this.escapeHtml(config.description)}</p></div><div class="grid gap-3 rounded-2xl border border-slate-800 bg-slate-900/30 p-4 sm:grid-cols-[1fr_12rem]"><input id="master-search" oninput="CMPE_UI.filterMasterRows()" type="search" placeholder="ค้นหาในตาราง" class="rounded-xl border border-slate-800 bg-slate-950/60 px-4 py-2.5 text-xs text-white outline-none focus:border-indigo-500" /><select id="master-sort" onchange="CMPE_UI.filterMasterRows()" class="rounded-xl border border-slate-800 bg-slate-950/60 px-3 py-2.5 text-xs text-slate-300"><option value="asc">เรียง ก–ฮ</option><option value="desc">เรียง ฮ–ก</option></select></div><div class="overflow-hidden rounded-3xl border border-slate-800 bg-slate-950/40"><table class="w-full text-left text-sm"><thead class="bg-slate-900 text-xs text-slate-400"><tr>${config.columns.map(c => `<th class="px-5 py-4">${this.escapeHtml(c.label)}</th>`).join('')}<th class="px-5 py-4 text-right">ดำเนินการ</th></tr></thead><tbody id="master-table-body"><tr><td colspan="${config.columns.length + 1}" class="py-12 text-center text-slate-500">กำลังโหลด...</td></tr></tbody></table></div></div>`;
+        try {
+          const list = await CMPE_API.call(config.action, config.payload || {});
+          this.masterListCache = Array.isArray(list) ? list : [];
+          this.masterCurrentPage = 1;
+          this.filterMasterRows();
+        } catch (e) {
+          document.getElementById('master-table-body').innerHTML = `<tr><td colspan="${config.columns.length + 1}" class="py-12 text-center text-rose-300">${this.escapeHtml(e.message || 'โหลดข้อมูลไม่สำเร็จ')}</td></tr>`;
+        }
+      },
+
+      filterMasterRows() {
+        const query = (document.getElementById('master-search')?.value || '').trim().toLowerCase();
+        const direction = document.getElementById('master-sort')?.value || 'asc';
+        const config = this.masterViewConfig;
+        let list = (this.masterListCache || []).filter(item => !query || config.columns.map(c => item[c.key]).join(' ').toLowerCase().includes(query));
+        const firstKey = config.columns[0].key;
+        list.sort((a, b) => String(a[firstKey] || '').localeCompare(String(b[firstKey] || ''), 'th') * (direction === 'desc' ? -1 : 1));
+        this.masterFilteredCache = list;
+        this.renderMasterRows(list);
+      },
+
+      renderMasterRows(list) {
+        const tbody = document.getElementById('master-table-body');
+        const config = this.masterViewConfig;
+        if (!tbody || !config) return;
+        const size = 15, pages = Math.max(1, Math.ceil(list.length / size));
+        this.masterCurrentPage = Math.min(this.masterCurrentPage || 1, pages);
+        const rows = list.slice((this.masterCurrentPage - 1) * size, this.masterCurrentPage * size);
+        tbody.innerHTML = rows.length ? rows.map(item => `<tr class="border-b border-slate-900 hover:bg-slate-900/30">${config.columns.map(c => `<td class="px-5 py-4 text-slate-300">${this.escapeHtml(c.format ? c.format(item[c.key], item) : (item[c.key] ?? '—'))}</td>`).join('')}<td class="px-5 py-4 text-right">${config.rowAction ? config.rowAction(item) : `<span class="font-mono text-[10px] text-slate-600">${this.escapeHtml(item[config.idKey] || '')}</span>`}</td></tr>`).join('') : `<tr><td colspan="${config.columns.length + 1}" class="py-12 text-center text-slate-500">ไม่พบข้อมูล</td></tr>`;
+        if (pages > 1) tbody.innerHTML += `<tr><td colspan="${config.columns.length + 1}" class="px-5 py-4"><div class="flex justify-between"><button onclick="CMPE_UI.changeMasterPage(-1)" ${this.masterCurrentPage === 1 ? 'disabled' : ''} class="rounded-lg border border-slate-700 px-3 py-2 text-xs disabled:opacity-30">ก่อนหน้า</button><span class="text-xs text-slate-500">หน้า ${this.masterCurrentPage}/${pages} · ${list.length} รายการ</span><button onclick="CMPE_UI.changeMasterPage(1)" ${this.masterCurrentPage === pages ? 'disabled' : ''} class="rounded-lg border border-slate-700 px-3 py-2 text-xs disabled:opacity-30">ถัดไป</button></div></td></tr>`;
+      },
+
+      changeMasterPage(delta) {
+        this.masterCurrentPage = Math.max(1, (this.masterCurrentPage || 1) + delta);
+        this.renderMasterRows(this.masterFilteredCache || []);
+      },
+
+      async setCurrentAcademicYear(academicYearId) {
+        try {
+          await CMPE_API.call('master.academicYears.setCurrent', { academicYearId });
+          this.showToast('เปลี่ยนปีการศึกษาปัจจุบันแล้ว', 'success');
+          await this.renderYearsView();
+        } catch (e) {
+          this.showToast(e.message || 'เปลี่ยนปีการศึกษาไม่สำเร็จ', 'error');
+        }
       },
 
       renderDashboardView() {
@@ -1903,6 +2011,23 @@
               </button>
             </div>
             
+            <div class="grid gap-3 rounded-2xl border border-slate-800 bg-slate-900/30 p-4 sm:grid-cols-[1fr_13rem_13rem]">
+              <input id="competition-search" oninput="CMPE_UI.filterCompetitionRows()" type="search" placeholder="ค้นหาชื่อหรือรหัสการแข่งขัน" class="rounded-xl border border-slate-800 bg-slate-950/60 px-4 py-2.5 text-xs text-white outline-none focus:border-indigo-500" />
+              <select id="competition-status-filter" onchange="CMPE_UI.filterCompetitionRows()" class="rounded-xl border border-slate-800 bg-slate-950/60 px-3 py-2.5 text-xs text-slate-300 outline-none">
+                <option value="">ทุกสถานะ</option>
+                <option value="DRAFT">ฉบับร่าง</option>
+                <option value="CONFIGURED">ตั้งค่าแล้ว</option>
+                <option value="REGISTRATION_OPEN">เปิดรับสมัคร</option>
+                <option value="REGISTRATION_CLOSED">ปิดรับสมัคร</option>
+                <option value="ARCHIVED">เก็บถาวร</option>
+              </select>
+              <select id="competition-sort" onchange="CMPE_UI.filterCompetitionRows()" class="rounded-xl border border-slate-800 bg-slate-950/60 px-3 py-2.5 text-xs text-slate-300 outline-none">
+                <option value="name-asc">ชื่อ ก–ฮ</option>
+                <option value="date-desc">วันที่ล่าสุดก่อน</option>
+                <option value="status-asc">เรียงตามสถานะ</option>
+              </select>
+            </div>
+
             <div class="border border-slate-800 bg-slate-950/40 rounded-3xl overflow-hidden shadow-xl">
               <table class="w-full text-left text-sm text-slate-300">
                 <thead class="bg-slate-900 text-xs text-slate-400 font-semibold uppercase">
@@ -1925,32 +2050,78 @@
         
         try {
           const list = await CMPE_API.call('competition.list');
-          const tbody = document.getElementById('competitions-table-body');
-          if (list.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="4" class="text-center py-8 text-slate-500">ไม่มีข้อมูลการแข่งขันในระบบ</td></tr>`;
-            return;
-          }
-          tbody.innerHTML = list.map(c => `
-            <tr class="border-b border-slate-900 hover:bg-slate-900/20">
-              <td class="px-6 py-4 font-mono text-xs">${c.competitionCode}</td>
-              <td class="px-6 py-4 font-medium text-white">${c.nameTh}</td>
-              <td class="px-6 py-4">
-                <span class="px-2 py-1 rounded-full text-[10px] font-bold bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
-                  ${c.status}
-                </span>
-              </td>
-              <td class="px-6 py-4 text-right space-x-2">
-                <button onclick="CMPE_UI.navigateTo('config-${c.competitionId}')" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs transition">ตั้งค่า</button>
-                <button onclick="CMPE_UI.cloneCompPrompt('${c.competitionId}')" class="px-3 py-1.5 bg-indigo-600/20 hover:bg-indigo-600 text-indigo-400 hover:text-white rounded-xl text-xs transition">โคลน</button>
-              </td>
-            </tr>
-          `).join('');
+          this.competitionListCache = Array.isArray(list) ? list : [];
+          this.competitionCurrentPage = 1;
+          this.filterCompetitionRows();
         } catch (e) {
-          this.showToast('ดึงข้อมูลการแข่งขันไม่สำเร็จ', 'error');
+          const tbody = document.getElementById('competitions-table-body');
+          if (tbody) tbody.innerHTML = `<tr><td colspan="4" class="px-6 py-12 text-center text-rose-300"><span class="material-icons-round block text-3xl">cloud_off</span><p class="mt-2">โหลดการแข่งขันไม่สำเร็จ</p><button onclick="CMPE_UI.renderCompetitionsView()" class="mt-3 rounded-lg border border-rose-700 px-3 py-2 text-xs">ลองใหม่</button></td></tr>`;
+          this.showToast(e.message || 'ดึงข้อมูลการแข่งขันไม่สำเร็จ', 'error');
         }
       },
 
-      openCreateCompetitionModal() {
+      filterCompetitionRows() {
+        const query = (document.getElementById('competition-search')?.value || '').trim().toLowerCase();
+        const status = document.getElementById('competition-status-filter')?.value || '';
+        const sort = document.getElementById('competition-sort')?.value || 'name-asc';
+        let list = (this.competitionListCache || []).filter(c =>
+          (!query || [c.competitionCode, c.nameTh, c.nameEn].join(' ').toLowerCase().includes(query)) &&
+          (!status || c.status === status)
+        );
+        list.sort((a, b) => {
+          if (sort === 'date-desc') return String(b.startDate || '').localeCompare(String(a.startDate || ''));
+          if (sort === 'status-asc') return String(a.status || '').localeCompare(String(b.status || ''));
+          return String(a.nameTh || '').localeCompare(String(b.nameTh || ''), 'th');
+        });
+        this.competitionFilteredCache = list;
+        this.renderCompetitionRows(list);
+      },
+
+      renderCompetitionRows(list) {
+        const tbody = document.getElementById('competitions-table-body');
+        if (!tbody) return;
+        const pageSize = 10;
+        const pages = Math.max(1, Math.ceil(list.length / pageSize));
+        this.competitionCurrentPage = Math.min(this.competitionCurrentPage || 1, pages);
+        const rows = list.slice((this.competitionCurrentPage - 1) * pageSize, this.competitionCurrentPage * pageSize);
+        if (!rows.length) {
+          tbody.innerHTML = `<tr><td colspan="4" class="text-center py-12 text-slate-500">ไม่พบการแข่งขันตามเงื่อนไข</td></tr>`;
+          return;
+        }
+        tbody.innerHTML = rows.map(c => `
+            <tr class="border-b border-slate-900 hover:bg-slate-900/20">
+              <td class="px-6 py-4 font-mono text-xs">${this.escapeHtml(c.competitionCode)}</td>
+              <td class="px-6 py-4"><p class="font-medium text-white">${this.escapeHtml(c.nameTh)}</p><p class="mt-1 text-[10px] text-slate-500">${this.escapeHtml(c.startDate || 'ยังไม่กำหนดวัน')} – ${this.escapeHtml(c.endDate || 'ยังไม่กำหนดวัน')}</p></td>
+              <td class="px-6 py-4">
+                <span class="px-2 py-1 rounded-full text-[10px] font-bold bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
+                  ${this.escapeHtml(c.status)}
+                </span>
+              </td>
+              <td class="px-6 py-4 text-right space-x-2">
+                <button onclick="CMPE_UI.navigateTo('config-${this.escapeHtml(c.competitionId)}')" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs transition">ตั้งค่า</button>
+                <button onclick="CMPE_UI.cloneCompPrompt('${this.escapeHtml(c.competitionId)}')" class="px-3 py-1.5 bg-indigo-600/20 hover:bg-indigo-600 text-indigo-400 hover:text-white rounded-xl text-xs transition">โคลน</button>
+              </td>
+            </tr>
+          `).join('') + (pages > 1 ? `<tr><td colspan="4" class="px-6 py-4"><div class="flex items-center justify-between"><button onclick="CMPE_UI.changeCompetitionPage(-1)" ${this.competitionCurrentPage === 1 ? 'disabled' : ''} class="rounded-lg border border-slate-700 px-3 py-2 text-xs disabled:opacity-30">ก่อนหน้า</button><span class="text-xs text-slate-500">หน้า ${this.competitionCurrentPage}/${pages} · ${list.length} รายการ</span><button onclick="CMPE_UI.changeCompetitionPage(1)" ${this.competitionCurrentPage === pages ? 'disabled' : ''} class="rounded-lg border border-slate-700 px-3 py-2 text-xs disabled:opacity-30">ถัดไป</button></div></td></tr>` : '');
+      },
+
+      changeCompetitionPage(delta) {
+        this.competitionCurrentPage = Math.max(1, (this.competitionCurrentPage || 1) + delta);
+        this.renderCompetitionRows(this.competitionFilteredCache || []);
+      },
+
+      async openCreateCompetitionModal() {
+        let years = [];
+        let types = [];
+        try {
+          [years, types] = await Promise.all([
+            CMPE_API.call('master.academicYears.list'),
+            CMPE_API.call('master.competitionTypes.list')
+          ]);
+        } catch (e) {
+          this.showToast(e.message || 'โหลดข้อมูลอ้างอิงสำหรับสร้างการแข่งขันไม่สำเร็จ', 'error');
+          return;
+        }
         const modal = document.createElement('div');
         modal.id = 'create-comp-modal';
         modal.className = 'fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4';
@@ -1966,6 +2137,14 @@
                 <label class="text-xs text-slate-400">ชื่อการแข่งขัน (ไทย)</label>
                 <input type="text" id="c-name-th" required class="w-full px-4 py-2.5 bg-slate-950/50 border border-slate-800 rounded-xl text-sm focus:outline-none focus:border-indigo-500 text-slate-200" />
               </div>
+              <div class="grid grid-cols-2 gap-3">
+                <label class="space-y-1"><span class="text-xs text-slate-400">ปีการศึกษา</span><select id="c-year" required class="w-full rounded-xl border border-slate-800 bg-slate-950/60 px-3 py-2.5 text-xs text-white">${years.map(y => `<option value="${this.escapeHtml(y.academicYearId)}">${this.escapeHtml(y.yearValue)}${y.isCurrent ? ' (ปัจจุบัน)' : ''}</option>`).join('')}</select></label>
+                <label class="space-y-1"><span class="text-xs text-slate-400">ประเภทการแข่งขัน</span><select id="c-type" required class="w-full rounded-xl border border-slate-800 bg-slate-950/60 px-3 py-2.5 text-xs text-white">${types.map(t => `<option value="${this.escapeHtml(t.competitionTypeId)}">${this.escapeHtml(t.nameTh || t.typeCode)}</option>`).join('')}</select></label>
+              </div>
+              <div class="grid grid-cols-2 gap-3">
+                <label class="space-y-1"><span class="text-xs text-slate-400">วันเริ่ม</span><input id="c-start-date" type="date" required class="w-full rounded-xl border border-slate-800 bg-slate-950/60 px-3 py-2.5 text-xs text-white" /></label>
+                <label class="space-y-1"><span class="text-xs text-slate-400">วันสิ้นสุด</span><input id="c-end-date" type="date" required class="w-full rounded-xl border border-slate-800 bg-slate-950/60 px-3 py-2.5 text-xs text-white" /></label>
+              </div>
               <div class="flex items-center justify-end space-x-3 pt-2">
                 <button type="button" onclick="document.getElementById('create-comp-modal').remove()" class="px-4 py-2 border border-slate-800 text-slate-300 rounded-xl text-xs">ยกเลิก</button>
                 <button type="submit" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold">สร้าง</button>
@@ -1980,22 +2159,28 @@
         event.preventDefault();
         const code = document.getElementById('c-code').value;
         const nameTh = document.getElementById('c-name-th').value;
+        const startDate = document.getElementById('c-start-date').value;
+        const endDate = document.getElementById('c-end-date').value;
+        if (endDate < startDate) {
+          this.showToast('วันสิ้นสุดต้องไม่น้อยกว่าวันเริ่มการแข่งขัน', 'error');
+          return;
+        }
 
         try {
           await CMPE_API.call('competition.create', {
             competitionCode: code,
             nameTh: nameTh,
             nameEn: code,
-            academicYearId: 'AY_2569',
-            competitionTypeId: 'TYPE_ROBOTICS',
-            startDate: '2026-08-01',
-            endDate: '2026-08-05'
+            academicYearId: document.getElementById('c-year').value,
+            competitionTypeId: document.getElementById('c-type').value,
+            startDate: startDate,
+            endDate: endDate
           });
           this.showToast('สร้างการแข่งขันสำเร็จ!', 'success');
           document.getElementById('create-comp-modal').remove();
           this.renderCompetitionsView();
         } catch (e) {
-          this.showToast('ไม่สามารถสร้างการแข่งขันได้', 'error');
+          this.showToast(e.message || 'ไม่สามารถสร้างการแข่งขันได้', 'error');
         }
       },
 
@@ -2069,9 +2254,17 @@
                   <span>หมวดหมู่รายปี</span>
                   <span class="material-icons-round text-sm">chevron_right</span>
                 </button>
+                <button onclick="CMPE_UI.showConfigTab('windows', '${compId}')" class="w-full text-left px-4 py-3 rounded-xl text-xs font-medium hover:bg-slate-900/50 text-slate-300 flex items-center justify-between">
+                  <span>ช่วงเวลาเปิดรับสมัคร</span>
+                  <span class="material-icons-round text-sm">date_range</span>
+                </button>
                 <button onclick="CMPE_UI.showConfigTab('ruleTester', '${compId}')" class="w-full text-left px-4 py-3 rounded-xl text-xs font-medium hover:bg-slate-900/50 text-slate-300 flex items-center justify-between">
                   <span>ทดสอบเครื่องมือกฎ (Rules)</span>
                   <span class="material-icons-round text-sm">chevron_right</span>
+                </button>
+                <button onclick="CMPE_UI.showConfigTab('readiness', '${compId}')" class="w-full text-left px-4 py-3 rounded-xl text-xs font-medium hover:bg-slate-900/50 text-slate-300 flex items-center justify-between">
+                  <span>ตรวจความพร้อมระบบ</span>
+                  <span class="material-icons-round text-sm">fact_check</span>
                 </button>
               </div>
 
@@ -2088,13 +2281,13 @@
 
       async loadCompConfigData(compId) {
         try {
-          const list = await CMPE_API.call('competition.list');
-          const comp = list.find(c => c.competitionId === compId);
+          const workspace = await CMPE_API.call('competition.workspace.get', { competitionId: compId });
+          this.competitionWorkspaceCache = workspace;
+          const comp = workspace.competition;
           if (comp) {
             document.getElementById('conf-comp-title').textContent = comp.nameTh;
             
-            // Fetch readiness
-            const readiness = await CMPE_API.call('competition.validateReadiness', { competitionId: compId });
+            const readiness = workspace.readiness;
             const badge = document.getElementById('readiness-badge');
             if (readiness.ready) {
               badge.innerHTML = `<span class="px-3 py-1.5 bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 text-xs font-bold rounded-xl">พร้อมดำเนินการ (Ready)</span>`;
@@ -2105,7 +2298,12 @@
             // Show default tab
             this.showConfigTab('rounds', compId);
           }
-        } catch (e) {}
+        } catch (e) {
+          document.getElementById('conf-comp-title').textContent = 'โหลดข้อมูลการตั้งค่าไม่สำเร็จ';
+          const panel = document.getElementById('config-detail-panel');
+          if (panel) panel.innerHTML = `<div class="py-12 text-center text-rose-300"><span class="material-icons-round text-4xl">cloud_off</span><p class="mt-2 text-sm">${this.escapeHtml(e.message || 'ไม่สามารถเชื่อมต่อข้อมูลการแข่งขันได้')}</p><button onclick="CMPE_UI.loadCompConfigData('${this.escapeHtml(compId)}')" class="mt-4 rounded-xl border border-rose-700 px-4 py-2 text-xs">ลองโหลดใหม่</button></div>`;
+          this.showToast(e.message || 'โหลดการตั้งค่าการแข่งขันไม่สำเร็จ', 'error');
+        }
       },
 
       async showConfigTab(tab, compId) {
@@ -2114,7 +2312,7 @@
         
         if (tab === 'rounds') {
           try {
-            const list = await CMPE_API.call('competition.rounds.list', { competitionId: compId });
+            const list = this.competitionWorkspaceCache?.rounds || [];
             panel.innerHTML = `
               <div class="space-y-4">
                 <div class="flex items-center justify-between">
@@ -2136,22 +2334,26 @@
                 </div>
               </div>
             `;
-          } catch (e) {}
+          } catch (e) {
+            panel.innerHTML = `<p class="py-12 text-center text-rose-300">${this.escapeHtml(e.message || 'โหลดรอบการแข่งขันไม่สำเร็จ')}</p>`;
+          }
         } else if (tab === 'categories') {
           try {
-            const list = await CMPE_API.call('competition.categories.list', { competitionId: compId });
+            const list = this.competitionWorkspaceCache?.categoryConfigs || [];
+            const lookups = this.competitionWorkspaceCache?.lookups || { categories: {}, levels: {} };
             panel.innerHTML = `
               <div class="space-y-4">
                 <div class="flex items-center justify-between">
                   <h3 class="text-sm font-semibold text-white">หมวดหมู่แข่งขันรายปี</h3>
+                  <button onclick="CMPE_UI.openAddCategoryConfigModal('${this.escapeHtml(compId)}')" class="rounded-xl bg-indigo-600 px-3 py-2 text-xs font-semibold text-white">เพิ่มหมวดหมู่</button>
                 </div>
                 <div class="space-y-2">
                   ${list.length === 0 ? '<p class="text-xs text-slate-500 text-center py-6">ไม่มีหมวดหมู่ที่ลงทะเบียน</p>' : ''}
                   ${list.map(c => `
                     <div class="p-4 bg-slate-950/40 border border-slate-800 rounded-2xl flex items-center justify-between">
                       <div>
-                        <h4 class="text-xs font-bold text-white">${c.categoryId}</h4>
-                        <p class="text-[10px] text-slate-500">ลำดับการแสดง: ${c.displayOrder}</p>
+                        <h4 class="text-xs font-bold text-white">${this.escapeHtml(lookups.categories[c.categoryId] || 'ไม่พบชื่อหมวดหมู่')}</h4>
+                        <p class="text-[10px] text-slate-500">${this.escapeHtml(lookups.levels[c.educationLevelId] || 'ไม่ระบุระดับ')} · ลำดับ ${c.displayOrder}</p>
                       </div>
                       <span class="px-2 py-0.5 rounded-full text-[9px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">${c.status}</span>
                     </div>
@@ -2159,7 +2361,16 @@
                 </div>
               </div>
             `;
-          } catch (e) {}
+          } catch (e) {
+            panel.innerHTML = `<p class="py-12 text-center text-rose-300">${this.escapeHtml(e.message || 'โหลดหมวดหมู่ไม่สำเร็จ')}</p>`;
+          }
+        } else if (tab === 'windows') {
+          const windows = this.competitionWorkspaceCache?.registrationWindows || [];
+          panel.innerHTML = `
+            <div class="space-y-4">
+              <div class="flex items-center justify-between"><h3 class="text-sm font-semibold text-white">ช่วงเวลาเปิดรับสมัคร</h3><button onclick="CMPE_UI.openRegistrationWindowModal('${this.escapeHtml(compId)}')" class="rounded-xl bg-indigo-600 px-3 py-2 text-xs font-semibold text-white">เพิ่มช่วงเวลา</button></div>
+              <div class="space-y-2">${windows.length ? windows.map(w => `<div class="rounded-2xl border border-slate-800 bg-slate-950/40 p-4"><div class="flex items-center justify-between"><p class="text-xs font-semibold text-white">${this.escapeHtml(new Date(w.openTimestamp).toLocaleString('th-TH'))} – ${this.escapeHtml(new Date(w.closeTimestamp).toLocaleString('th-TH'))}</p><span class="rounded-full border border-emerald-800 px-2 py-1 text-[10px] text-emerald-400">${this.escapeHtml(w.status)}</span></div></div>`).join('') : '<p class="py-8 text-center text-xs text-slate-500">ยังไม่ได้กำหนดช่วงรับสมัคร</p>'}</div>
+            </div>`;
         } else if (tab === 'ruleTester') {
           panel.innerHTML = `
             <div class="space-y-4">
@@ -2181,6 +2392,109 @@
               </div>
             </div>
           `;
+        } else if (tab === 'readiness') {
+          const readiness = this.competitionWorkspaceCache?.readiness || { ready: false, errors: ['ยังไม่มีข้อมูลตรวจสอบ'] };
+          const messages = {
+            'At least one active competition round is required.': 'ต้องมีรอบการแข่งขันที่เปิดใช้งานอย่างน้อย 1 รอบ',
+            'At least one annual category configuration must be assigned.': 'ต้องกำหนดหมวดหมู่การแข่งขันอย่างน้อย 1 รายการ',
+            'At least one active registration window must be defined.': 'ต้องกำหนดช่วงเวลาเปิด–ปิดรับสมัคร'
+          };
+          panel.innerHTML = `
+            <div class="space-y-5">
+              <div class="flex items-center gap-3">
+                <span class="material-icons-round text-3xl ${readiness.ready ? 'text-emerald-400' : 'text-amber-400'}">${readiness.ready ? 'verified' : 'warning'}</span>
+                <div><h3 class="text-sm font-semibold text-white">${readiness.ready ? 'การแข่งขันพร้อมใช้งาน' : 'ยังตั้งค่าไม่ครบ'}</h3><p class="text-xs text-slate-500">ตรวจความสัมพันธ์ของรอบ หมวด กติกาคะแนน และช่วงรับสมัคร</p></div>
+              </div>
+              <div class="space-y-2">
+                ${(readiness.errors || []).length ? readiness.errors.map((error, index) => `<div class="flex gap-3 rounded-xl border border-amber-900/40 bg-amber-950/20 p-3 text-xs text-amber-200"><span>${index + 1}.</span><span>${this.escapeHtml(messages[error] || error.replace('configuration is missing scoreTemplateId.', 'ยังไม่มีรูปแบบคะแนน').replace('configuration is missing medalRuleId.', 'ยังไม่มีกฎเหรียญรางวัล'))}</span></div>`).join('') : '<div class="rounded-xl border border-emerald-900/40 bg-emerald-950/20 p-4 text-xs text-emerald-300">ผ่านการตรวจสอบทุกเงื่อนไข</div>'}
+              </div>
+              <button onclick="CMPE_UI.loadCompConfigData('${this.escapeHtml(compId)}')" class="rounded-xl bg-indigo-600 px-4 py-2.5 text-xs font-semibold text-white">ตรวจสอบอีกครั้ง</button>
+            </div>`;
+        }
+      },
+
+      async openAddCategoryConfigModal(compId) {
+        try {
+          const [categories, levels, scoreTemplates, medalRules, quotaRules] = await Promise.all([
+            CMPE_API.call('master.categories.list'),
+            CMPE_API.call('master.educationLevels.list'),
+            CMPE_API.call('configuration.scoreTemplates.list'),
+            CMPE_API.call('configuration.medalRules.list'),
+            CMPE_API.call('configuration.quotaRules.list')
+          ]);
+          if (!categories.length || !levels.length) {
+            this.showToast('ต้องมีข้อมูลหมวดหมู่และระดับการศึกษาก่อน', 'error');
+            return;
+          }
+          const modal = document.createElement('div');
+          modal.id = 'category-config-modal';
+          modal.className = 'fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-sm';
+          modal.innerHTML = `<div class="w-full max-w-lg space-y-5 rounded-3xl border border-slate-800 bg-slate-900 p-6"><div><h3 class="text-lg font-bold text-white">เพิ่มหมวดหมู่ในการแข่งขัน</h3><p class="text-xs text-slate-500">เชื่อมหมวดหมู่ ระดับ เกณฑ์คะแนน เหรียญ และโควตาเข้าด้วยกัน</p></div><form onsubmit="CMPE_UI.saveCategoryConfig(event, '${this.escapeHtml(compId)}')" class="grid gap-4 sm:grid-cols-2">
+            <label class="space-y-1 sm:col-span-2"><span class="text-xs text-slate-400">หมวดหมู่กิจกรรม</span><select id="cfg-category" required class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2.5 text-xs text-white">${categories.map(x => `<option value="${this.escapeHtml(x.categoryId)}">${this.escapeHtml(x.nameTh || x.categoryCode)}</option>`).join('')}</select></label>
+            <label class="space-y-1"><span class="text-xs text-slate-400">ระดับการศึกษา</span><select id="cfg-level" required class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2.5 text-xs text-white">${levels.map(x => `<option value="${this.escapeHtml(x.educationLevelId)}">${this.escapeHtml(x.nameTh || x.levelCode)}</option>`).join('')}</select></label>
+            <label class="space-y-1"><span class="text-xs text-slate-400">ลำดับแสดงผล</span><input id="cfg-order" type="number" min="1" value="1" required class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2.5 text-xs text-white" /></label>
+            <label class="space-y-1"><span class="text-xs text-slate-400">รูปแบบคะแนน</span><select id="cfg-score-template" class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2.5 text-xs text-white"><option value="">ยังไม่กำหนด</option>${scoreTemplates.map(x => `<option value="${this.escapeHtml(x.scoreTemplateId)}">${this.escapeHtml(x.name)}</option>`).join('')}</select></label>
+            <label class="space-y-1"><span class="text-xs text-slate-400">กฎเหรียญรางวัล</span><select id="cfg-medal-rule" class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2.5 text-xs text-white"><option value="">ยังไม่กำหนด</option>${medalRules.map(x => `<option value="${this.escapeHtml(x.medalRuleId)}">${this.escapeHtml(x.name)}</option>`).join('')}</select></label>
+            <label class="space-y-1 sm:col-span-2"><span class="text-xs text-slate-400">กฎโควตา</span><select id="cfg-quota-rule" class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2.5 text-xs text-white"><option value="">ยังไม่กำหนด</option>${quotaRules.map(x => `<option value="${this.escapeHtml(x.quotaRuleId)}">${this.escapeHtml(x.name)}</option>`).join('')}</select></label>
+            <div class="flex justify-end gap-3 sm:col-span-2"><button type="button" onclick="document.getElementById('category-config-modal').remove()" class="rounded-xl border border-slate-700 px-4 py-2.5 text-xs">ยกเลิก</button><button class="rounded-xl bg-indigo-600 px-4 py-2.5 text-xs font-semibold text-white">บันทึกหมวดหมู่</button></div>
+          </form></div>`;
+          document.body.appendChild(modal);
+        } catch (e) {
+          this.showToast(e.message || 'โหลดข้อมูลตั้งค่าหมวดหมู่ไม่สำเร็จ', 'error');
+        }
+      },
+
+      async saveCategoryConfig(event, compId) {
+        event.preventDefault();
+        try {
+          await CMPE_API.call('competition.categories.add', {
+            competitionId: compId,
+            categoryId: document.getElementById('cfg-category').value,
+            educationLevelId: document.getElementById('cfg-level').value,
+            scoreTemplateId: document.getElementById('cfg-score-template').value,
+            medalRuleId: document.getElementById('cfg-medal-rule').value,
+            quotaRuleId: document.getElementById('cfg-quota-rule').value,
+            displayOrder: Number(document.getElementById('cfg-order').value),
+            status: 'ACTIVE'
+          });
+          document.getElementById('category-config-modal')?.remove();
+          this.showToast('เพิ่มหมวดหมู่ในการแข่งขันแล้ว', 'success');
+          await this.loadCompConfigData(compId);
+          this.showConfigTab('categories', compId);
+        } catch (e) {
+          this.showToast(e.message || 'เพิ่มหมวดหมู่ไม่สำเร็จ', 'error');
+        }
+      },
+
+      openRegistrationWindowModal(compId) {
+        const modal = document.createElement('div');
+        modal.id = 'registration-window-modal';
+        modal.className = 'fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-sm';
+        modal.innerHTML = `<div class="w-full max-w-md space-y-5 rounded-3xl border border-slate-800 bg-slate-900 p-6"><h3 class="text-lg font-bold text-white">กำหนดช่วงเปิดรับสมัคร</h3><form onsubmit="CMPE_UI.saveRegistrationWindow(event, '${this.escapeHtml(compId)}')" class="space-y-4"><label class="block space-y-1"><span class="text-xs text-slate-400">เปิดรับสมัคร</span><input id="window-open" type="datetime-local" required class="w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-2.5 text-xs text-white" /></label><label class="block space-y-1"><span class="text-xs text-slate-400">ปิดรับสมัคร</span><input id="window-close" type="datetime-local" required class="w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-2.5 text-xs text-white" /></label><div class="flex justify-end gap-3"><button type="button" onclick="document.getElementById('registration-window-modal').remove()" class="rounded-xl border border-slate-700 px-4 py-2.5 text-xs">ยกเลิก</button><button class="rounded-xl bg-indigo-600 px-4 py-2.5 text-xs font-semibold text-white">บันทึกช่วงเวลา</button></div></form></div>`;
+        document.body.appendChild(modal);
+      },
+
+      async saveRegistrationWindow(event, compId) {
+        event.preventDefault();
+        const openTimestamp = new Date(document.getElementById('window-open').value).toISOString();
+        const closeTimestamp = new Date(document.getElementById('window-close').value).toISOString();
+        if (closeTimestamp <= openTimestamp) {
+          this.showToast('เวลาปิดรับสมัครต้องอยู่หลังเวลาเปิด', 'error');
+          return;
+        }
+        try {
+          await CMPE_API.call('configuration.registrationWindows.create', {
+            competitionId: compId,
+            openTimestamp: openTimestamp,
+            closeTimestamp: closeTimestamp,
+            status: 'ACTIVE'
+          });
+          document.getElementById('registration-window-modal')?.remove();
+          this.showToast('บันทึกช่วงเปิดรับสมัครแล้ว', 'success');
+          await this.loadCompConfigData(compId);
+          this.showConfigTab('windows', compId);
+        } catch (e) {
+          this.showToast(e.message || 'บันทึกช่วงรับสมัครไม่สำเร็จ', 'error');
         }
       },
 
@@ -2225,7 +2539,7 @@
           });
           this.showToast('เพิ่มรอบการแข่งขันสำเร็จ!', 'success');
           document.getElementById('create-round-modal').remove();
-          this.showConfigTab('rounds', compId);
+          await this.loadCompConfigData(compId);
         } catch (e) {
           this.showToast('เพิ่มรอบการแข่งขันไม่สำเร็จ', 'error');
         }
@@ -2291,6 +2605,17 @@
                 <h2 class="text-xl font-bold text-white">ระบบจัดการ Tenants</h2>
                 <p class="text-xs text-slate-400">ควบคุมและแยกบัญชีข้อมูลเขตพื้นที่การศึกษา</p>
               </div>
+              <button onclick="CMPE_UI.openTenantModal()" class="rounded-xl bg-indigo-600 px-4 py-2.5 text-xs font-semibold text-white hover:bg-indigo-500"><span class="material-icons-round mr-1 align-middle text-sm">add_business</span>เพิ่มเขตพื้นที่</button>
+            </div>
+
+            <div class="grid gap-3 rounded-2xl border border-slate-800 bg-slate-900/30 p-4 sm:grid-cols-[1fr_12rem_12rem]">
+              <input id="tenant-search" oninput="CMPE_UI.filterTenantRows()" type="search" placeholder="ค้นหาชื่อ จังหวัด รหัส หรือผู้ดูแล" class="rounded-xl border border-slate-800 bg-slate-950/60 px-4 py-2.5 text-xs text-white outline-none focus:border-indigo-500" />
+              <select id="tenant-status-filter" onchange="CMPE_UI.filterTenantRows()" class="rounded-xl border border-slate-800 bg-slate-950/60 px-3 py-2.5 text-xs text-slate-300 outline-none">
+                <option value="">ทุกสถานะ</option><option value="ACTIVE">เปิดใช้งาน</option><option value="SUSPENDED">ระงับใช้งาน</option><option value="ARCHIVED">เก็บถาวร</option>
+              </select>
+              <select id="tenant-sort" onchange="CMPE_UI.filterTenantRows()" class="rounded-xl border border-slate-800 bg-slate-950/60 px-3 py-2.5 text-xs text-slate-300 outline-none">
+                <option value="name-asc">ชื่อ ก–ฮ</option><option value="province-asc">จังหวัด ก–ฮ</option><option value="status-asc">เรียงตามสถานะ</option>
+              </select>
             </div>
             
             <div class="border border-slate-800 bg-slate-950/40 rounded-3xl overflow-hidden shadow-xl">
@@ -2301,11 +2626,12 @@
                     <th class="px-6 py-4">ชื่อเขตพื้นที่</th>
                     <th class="px-6 py-4">จังหวัด</th>
                     <th class="px-6 py-4">สถานะ</th>
+                    <th class="px-6 py-4 text-right">ดำเนินการ</th>
                   </tr>
                 </thead>
                 <tbody id="tenants-table-body">
                   <tr>
-                    <td colspan="4" class="text-center py-8 text-slate-500">กำลังโหลด...</td>
+                    <td colspan="5" class="text-center py-8 text-slate-500">กำลังโหลด...</td>
                   </tr>
                 </tbody>
               </table>
@@ -2315,25 +2641,120 @@
         
         try {
           const list = await CMPE_API.call('master.tenants.list');
+          this.tenantListCache = Array.isArray(list) ? list : [];
+          this.tenantCurrentPage = 1;
+          this.filterTenantRows();
+        } catch (e) {
           const tbody = document.getElementById('tenants-table-body');
-          if (list.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="4" class="text-center py-8 text-slate-500">ไม่มีข้อมูล Tenant ในระบบ</td></tr>`;
-            return;
-          }
-          tbody.innerHTML = list.map(t => `
+          if (tbody) tbody.innerHTML = `<tr><td colspan="5" class="px-6 py-12 text-center text-rose-300"><span class="material-icons-round block text-3xl">cloud_off</span><p class="mt-2">โหลดข้อมูลเขตพื้นที่ไม่สำเร็จ</p><p class="mt-1 text-[10px] text-rose-400">${this.escapeHtml(e.message || '')}</p><button onclick="CMPE_UI.renderTenantsView()" class="mt-3 rounded-lg border border-rose-700 px-3 py-2 text-xs">ลองใหม่</button></td></tr>`;
+          this.showToast(e.message || 'ไม่สามารถดึงข้อมูล Tenant ได้', 'error');
+        }
+      },
+
+      filterTenantRows() {
+        const query = (document.getElementById('tenant-search')?.value || '').trim().toLowerCase();
+        const status = document.getElementById('tenant-status-filter')?.value || '';
+        const sort = document.getElementById('tenant-sort')?.value || 'name-asc';
+        let list = (this.tenantListCache || []).filter(t =>
+          (!query || [t.tenantId, t.name, t.province, t.adminUsername].join(' ').toLowerCase().includes(query)) &&
+          (!status || t.status === status)
+        );
+        list.sort((a, b) => {
+          if (sort === 'province-asc') return String(a.province || '').localeCompare(String(b.province || ''), 'th');
+          if (sort === 'status-asc') return String(a.status || '').localeCompare(String(b.status || ''));
+          return String(a.name || '').localeCompare(String(b.name || ''), 'th');
+        });
+        this.tenantFilteredCache = list;
+        this.renderTenantRows(list);
+      },
+
+      renderTenantRows(list) {
+        const tbody = document.getElementById('tenants-table-body');
+        if (!tbody) return;
+        const pageSize = 10;
+        const pages = Math.max(1, Math.ceil(list.length / pageSize));
+        this.tenantCurrentPage = Math.min(this.tenantCurrentPage || 1, pages);
+        const rows = list.slice((this.tenantCurrentPage - 1) * pageSize, this.tenantCurrentPage * pageSize);
+        if (!rows.length) {
+          tbody.innerHTML = `<tr><td colspan="5" class="py-12 text-center text-slate-500">ไม่พบข้อมูลเขตพื้นที่ตามเงื่อนไข</td></tr>`;
+          return;
+        }
+        tbody.innerHTML = rows.map(t => `
             <tr class="border-b border-slate-900 hover:bg-slate-900/20">
-              <td class="px-6 py-4 font-mono text-xs">${t.tenantId}</td>
-              <td class="px-6 py-4 font-medium text-white">${t.name}</td>
-              <td class="px-6 py-4">${t.province}</td>
+              <td class="px-6 py-4"><p class="font-mono text-xs">${this.escapeHtml(t.tenantId)}</p><p class="mt-1 text-[10px] text-slate-500">${this.escapeHtml(t.adminUsername || 'ยังไม่กำหนดผู้ดูแล')}</p></td>
+              <td class="px-6 py-4 font-medium text-white">${this.escapeHtml(t.name)}</td>
+              <td class="px-6 py-4">${this.escapeHtml(t.province)}</td>
               <td class="px-6 py-4">
                 <span class="px-2 py-1 rounded-full text-[10px] font-bold ${t.status === 'ACTIVE' ? 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20' : 'bg-rose-500/10 text-rose-500 border border-rose-500/20'}">
-                  ${t.status}
+                  ${this.escapeHtml(t.status)}
                 </span>
               </td>
+              <td class="px-6 py-4 text-right"><button onclick="CMPE_UI.openTenantModal('${this.escapeHtml(t.tenantId)}')" class="rounded-lg bg-slate-800 px-3 py-2 text-xs text-slate-200">แก้ไข</button><button onclick="CMPE_UI.toggleTenantStatus('${this.escapeHtml(t.tenantId)}')" class="ml-2 rounded-lg border border-slate-700 px-3 py-2 text-xs text-slate-300">${t.status === 'ACTIVE' ? 'ระงับ' : 'เปิดใช้'}</button></td>
             </tr>
-          `).join('');
+          `).join('') + (pages > 1 ? `<tr><td colspan="5" class="px-6 py-4"><div class="flex items-center justify-between"><button onclick="CMPE_UI.changeTenantPage(-1)" ${this.tenantCurrentPage === 1 ? 'disabled' : ''} class="rounded-lg border border-slate-700 px-3 py-2 text-xs disabled:opacity-30">ก่อนหน้า</button><span class="text-xs text-slate-500">หน้า ${this.tenantCurrentPage}/${pages} · ${list.length} เขตพื้นที่</span><button onclick="CMPE_UI.changeTenantPage(1)" ${this.tenantCurrentPage === pages ? 'disabled' : ''} class="rounded-lg border border-slate-700 px-3 py-2 text-xs disabled:opacity-30">ถัดไป</button></div></td></tr>` : '');
+      },
+
+      changeTenantPage(delta) {
+        this.tenantCurrentPage = Math.max(1, (this.tenantCurrentPage || 1) + delta);
+        this.renderTenantRows(this.tenantFilteredCache || []);
+      },
+
+      openTenantModal(tenantId = '') {
+        const current = (this.tenantListCache || []).find(t => t.tenantId === tenantId) || {};
+        const editing = Boolean(tenantId);
+        const modal = document.createElement('div');
+        modal.id = 'tenant-modal';
+        modal.className = 'fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-sm';
+        modal.innerHTML = `
+          <div class="w-full max-w-lg space-y-5 rounded-3xl border border-slate-800 bg-slate-900 p-6 shadow-2xl">
+            <div><h3 class="text-lg font-bold text-white">${editing ? 'แก้ไขข้อมูลเขตพื้นที่' : 'เพิ่มเขตพื้นที่ใหม่'}</h3><p class="text-xs text-slate-500">ข้อมูลนี้เป็นขอบเขตหลักสำหรับแยกโรงเรียน ผู้ใช้ และการแข่งขัน</p></div>
+            <form onsubmit="CMPE_UI.saveTenant(event, ${editing ? `'${this.escapeHtml(tenantId)}'` : "''"})" class="grid gap-4 sm:grid-cols-2">
+              <label class="space-y-1 sm:col-span-2"><span class="text-xs text-slate-400">Tenant ID</span><input id="tenant-form-id" ${editing ? 'readonly' : 'required'} value="${this.escapeHtml(current.tenantId || '')}" placeholder="เช่น SESAO_SAKON" class="w-full rounded-xl border border-slate-800 bg-slate-950/60 px-4 py-2.5 text-sm text-white outline-none read-only:opacity-60" /></label>
+              <label class="space-y-1 sm:col-span-2"><span class="text-xs text-slate-400">ชื่อเขตพื้นที่</span><input id="tenant-form-name" required value="${this.escapeHtml(current.name || '')}" class="w-full rounded-xl border border-slate-800 bg-slate-950/60 px-4 py-2.5 text-sm text-white outline-none focus:border-indigo-500" /></label>
+              <label class="space-y-1"><span class="text-xs text-slate-400">จังหวัด</span><input id="tenant-form-province" required value="${this.escapeHtml(current.province || '')}" class="w-full rounded-xl border border-slate-800 bg-slate-950/60 px-4 py-2.5 text-sm text-white outline-none focus:border-indigo-500" /></label>
+              <label class="space-y-1"><span class="text-xs text-slate-400">ชื่อผู้ดูแลหลัก</span><input id="tenant-form-admin" value="${this.escapeHtml(current.adminUsername || '')}" placeholder="กำหนดภายหลังได้" class="w-full rounded-xl border border-slate-800 bg-slate-950/60 px-4 py-2.5 text-sm text-white outline-none focus:border-indigo-500" /></label>
+              <div class="flex justify-end gap-3 pt-2 sm:col-span-2"><button type="button" onclick="document.getElementById('tenant-modal').remove()" class="rounded-xl border border-slate-700 px-4 py-2.5 text-xs text-slate-300">ยกเลิก</button><button type="submit" class="rounded-xl bg-indigo-600 px-4 py-2.5 text-xs font-semibold text-white">${editing ? 'บันทึกการแก้ไข' : 'สร้างเขตพื้นที่'}</button></div>
+            </form>
+          </div>`;
+        document.body.appendChild(modal);
+      },
+
+      async saveTenant(event, tenantId) {
+        event.preventDefault();
+        const existing = (this.tenantListCache || []).find(t => t.tenantId === tenantId);
+        const payload = {
+          tenantId: document.getElementById('tenant-form-id').value.trim().toUpperCase(),
+          name: document.getElementById('tenant-form-name').value.trim(),
+          province: document.getElementById('tenant-form-province').value.trim(),
+          adminUsername: document.getElementById('tenant-form-admin').value.trim(),
+          status: existing?.status || 'ACTIVE',
+          rowVersion: existing?.rowVersion
+        };
+        try {
+          await CMPE_API.call(existing ? 'master.tenants.update' : 'master.tenants.create', payload);
+          document.getElementById('tenant-modal')?.remove();
+          this.showToast(existing ? 'บันทึกข้อมูลเขตพื้นที่แล้ว' : 'สร้างเขตพื้นที่แล้ว', 'success');
+          await this.renderTenantsView();
         } catch (e) {
-          this.showToast('ไม่สามารถดึงข้อมูล Tenant ได้', 'error');
+          this.showToast(e.message || 'บันทึกข้อมูลเขตพื้นที่ไม่สำเร็จ', 'error');
+        }
+      },
+
+      async toggleTenantStatus(tenantId) {
+        const tenant = (this.tenantListCache || []).find(t => t.tenantId === tenantId);
+        if (!tenant) return;
+        const status = tenant.status === 'ACTIVE' ? 'SUSPENDED' : 'ACTIVE';
+        if (!confirm(`${status === 'ACTIVE' ? 'เปิดใช้งาน' : 'ระงับใช้งาน'} ${tenant.name} หรือไม่?`)) return;
+        try {
+          await CMPE_API.call('master.tenants.transition', {
+            tenantId: tenant.tenantId,
+            status: status,
+            rowVersion: tenant.rowVersion
+          });
+          this.showToast('เปลี่ยนสถานะเขตพื้นที่แล้ว', 'success');
+          await this.renderTenantsView();
+        } catch (e) {
+          this.showToast(e.message || 'เปลี่ยนสถานะไม่สำเร็จ', 'error');
         }
       },
 

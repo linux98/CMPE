@@ -537,7 +537,18 @@ function apiDispatcher(requestEnvelope) {
       // Enforce specific action permissions
       if (action === "master.tenants.list") {
         const repo = new TenantRepository();
-        return CMPE_UTILITIES.successEnvelope(repo.findAll(), reqId);
+        const tenants = repo.findAll().map(function(t) {
+          return {
+            tenantId: t.tenantId,
+            name: t.name,
+            province: t.province,
+            adminUsername: t.adminUsername,
+            status: t.status,
+            rowVersion: t.rowVersion,
+            recordStatus: t.recordStatus
+          };
+        });
+        return CMPE_UTILITIES.successEnvelope(tenants, reqId);
       }
       if (action === "master.tenants.create") {
         if (actor.permissions.indexOf("tenant.create") === -1) {
@@ -545,7 +556,40 @@ function apiDispatcher(requestEnvelope) {
         }
         const svc = new TenantService(new TenantRepository());
         const tenant = svc.createTenant(payload, actor);
-        return CMPE_UTILITIES.successEnvelope(tenant, reqId);
+        return CMPE_UTILITIES.successEnvelope({
+          tenantId: tenant.tenantId, name: tenant.name, province: tenant.province,
+          adminUsername: tenant.adminUsername, status: tenant.status,
+          rowVersion: tenant.rowVersion
+        }, reqId);
+      }
+      if (action === "master.tenants.update") {
+        if (actor.permissions.indexOf("tenant.update") === -1) {
+          return CMPE_UTILITIES.errorEnvelope("ERR_UNAUTHORIZED", "Missing tenant.update permission", [], reqId);
+        }
+        const svc = new TenantService(new TenantRepository());
+        const tenant = svc.updateTenant(payload, payload.rowVersion, actor);
+        return CMPE_UTILITIES.successEnvelope({
+          tenantId: tenant.tenantId, name: tenant.name, province: tenant.province,
+          adminUsername: tenant.adminUsername, status: tenant.status,
+          rowVersion: tenant.rowVersion
+        }, reqId);
+      }
+      if (action === "master.tenants.transition") {
+        if (actor.permissions.indexOf("tenant.transition") === -1) {
+          return CMPE_UTILITIES.errorEnvelope("ERR_UNAUTHORIZED", "Missing tenant.transition permission", [], reqId);
+        }
+        const svc = new TenantService(new TenantRepository());
+        const tenant = svc.transitionStatus(
+          payload.tenantId,
+          payload.status,
+          payload.rowVersion,
+          actor
+        );
+        return CMPE_UTILITIES.successEnvelope({
+          tenantId: tenant.tenantId, name: tenant.name, province: tenant.province,
+          adminUsername: tenant.adminUsername, status: tenant.status,
+          rowVersion: tenant.rowVersion
+        }, reqId);
       }
       if (action === "master.academicYears.list") {
         const repo = new AcademicYearRepository();
@@ -651,6 +695,39 @@ function apiDispatcher(requestEnvelope) {
       if (action === "competition.list") {
         return CMPE_UTILITIES.successEnvelope(compRepo.findByTenant(tenantId), reqId);
       }
+      if (action === "competition.workspace.get") {
+        const competition = compRepo.findById(payload.competitionId, tenantId);
+        if (!competition) {
+          return CMPE_UTILITIES.errorEnvelope(
+            "ERR_COMP_NOT_FOUND",
+            "Competition was not found in this tenant.",
+            [],
+            reqId
+          );
+        }
+        const rounds = roundRepo.findByCompetition(payload.competitionId);
+        const categoryConfigs = catConfigRepo.findByCompetition(payload.competitionId);
+        const registrationWindows = windowRepo.findByCompetition(payload.competitionId);
+        const readiness = readinessSvc.checkReadiness(payload.competitionId, actor);
+        const categories = new CompetitionCategoryRepository().findByTenant(tenantId);
+        const levels = new EducationLevelRepository().findAll();
+        const categoryMap = {};
+        const levelMap = {};
+        categories.forEach(function(item) {
+          categoryMap[item.categoryId] = item.nameTh || item.nameEn || item.categoryCode;
+        });
+        levels.forEach(function(item) {
+          levelMap[item.educationLevelId] = item.nameTh || item.nameEn || item.levelCode;
+        });
+        return CMPE_UTILITIES.successEnvelope({
+          competition: competition,
+          rounds: rounds,
+          categoryConfigs: categoryConfigs,
+          registrationWindows: registrationWindows,
+          readiness: readiness,
+          lookups: { categories: categoryMap, levels: levelMap }
+        }, reqId);
+      }
       if (action === "competition.create") {
         if (actor.permissions.indexOf("competition.create") === -1) {
           return CMPE_UTILITIES.errorEnvelope("ERR_UNAUTHORIZED", "Missing competition.create permission", [], reqId);
@@ -693,7 +770,8 @@ function apiDispatcher(requestEnvelope) {
           return CMPE_UTILITIES.errorEnvelope("ERR_UNAUTHORIZED", "Missing competitionRound.manage permission", [], reqId);
         }
         const round = new CompetitionRoundEntity(payload);
-        round.roundId = payload.roundId || CMPE_UTILITIES.generateUuid();
+        round.competitionRoundId =
+          payload.competitionRoundId || payload.roundId || CMPE_UTILITIES.generateUuid();
         const created = roundRepo.create(round, actor);
         return CMPE_UTILITIES.successEnvelope(created, reqId);
       }
@@ -707,7 +785,8 @@ function apiDispatcher(requestEnvelope) {
           return CMPE_UTILITIES.errorEnvelope("ERR_UNAUTHORIZED", "Missing competitionCategoryConfig.manage permission", [], reqId);
         }
         const config = new CompetitionCategoryConfigEntity(payload);
-        config.configId = payload.configId || CMPE_UTILITIES.generateUuid();
+        config.competitionCategoryConfigId =
+          payload.competitionCategoryConfigId || payload.configId || CMPE_UTILITIES.generateUuid();
         const created = catConfigRepo.create(config, actor);
         return CMPE_UTILITIES.successEnvelope(created, reqId);
       }
