@@ -34,6 +34,143 @@ function rowsToCsv_(rows) {
   ].join("\r\n");
 }
 
+function buildExecutiveDashboard_(actor) {
+  const tenantId = actor.tenantId;
+  const canReadTenant = actor.permissions.indexOf("dashboard.readTenant") !== -1;
+  const schools = readActiveRows_("schools", tenantId);
+  const venues = readActiveRows_("venues", tenantId);
+  const categories = readActiveRows_("competition_categories", tenantId);
+  const competitions = readActiveRows_("competitions", tenantId);
+  const configs = readActiveRows_("competition_category_configs", tenantId);
+  const allRegistrations = readActiveRows_("registrations", tenantId);
+  const registrations = canReadTenant || !actor.schoolId
+    ? allRegistrations
+    : allRegistrations.filter(row => row.schoolId === actor.schoolId);
+  const registrationIds = new Set(registrations.map(row => row.registrationId));
+  const checkins = readActiveRows_("checkin_logs", tenantId)
+    .filter(row => registrationIds.has(row.registrationId));
+  const scorecards = readActiveRows_("scorecards", tenantId)
+    .filter(row => registrationIds.has(row.registrationId));
+
+  const schoolById = {};
+  const categoryById = {};
+  const configById = {};
+  schools.forEach(row => schoolById[row.schoolId] = row.nameTh || row.nameEn || row.schoolId);
+  categories.forEach(row => categoryById[row.categoryId] = row.nameTh || row.nameEn || row.categoryId);
+  configs.forEach(row => configById[row.competitionCategoryConfigId] = row);
+
+  const countBy = (rows, key) => rows.reduce((result, row) => {
+    const value = String(row[key] || "ไม่ระบุ");
+    result[value] = (result[value] || 0) + 1;
+    return result;
+  }, {});
+  const asSeries = map => Object.keys(map).map(key => ({ key: key, value: map[key] }))
+    .sort((a, b) => b.value - a.value || a.key.localeCompare(b.key, "th"));
+
+  const status = countBy(registrations, "registrationStatus");
+  const submitted = registrations.filter(row =>
+    ["SUBMITTED", "UNDER_REVIEW", "APPROVED", "CHECKED_IN", "COMPETED", "COMPLETED"].indexOf(row.registrationStatus) !== -1
+  ).length;
+  const approved = registrations.filter(row =>
+    ["APPROVED", "CHECKED_IN", "COMPETED", "COMPLETED"].indexOf(row.registrationStatus) !== -1
+  ).length;
+  const reversed = {};
+  checkins.forEach(row => {
+    if (row.checkinStatus === "REVERSED" && row.reversalOfCheckinLogId) reversed[row.reversalOfCheckinLogId] = true;
+  });
+  const activeCheckinRegistrationIds = new Set(checkins
+    .filter(row => row.checkinStatus === "CHECKED_IN" && !reversed[row.checkinLogId])
+    .map(row => row.registrationId));
+  const finishedScores = scorecards.filter(row =>
+    ["SUBMITTED", "VERIFIED", "HARD_LOCKED"].indexOf(row.scorecardStatus) !== -1
+  ).length;
+  const participatingSchoolIds = new Set(registrations.map(row => row.schoolId).filter(Boolean));
+
+  const categoryCounts = {};
+  registrations.forEach(row => {
+    const config = configById[row.competitionCategoryConfigId];
+    const label = config && categoryById[config.categoryId]
+      ? categoryById[config.categoryId] : "ยังไม่ผูกหมวดกิจกรรม";
+    categoryCounts[label] = (categoryCounts[label] || 0) + 1;
+  });
+  const schoolCounts = {};
+  registrations.forEach(row => {
+    const label = schoolById[row.schoolId] || "ยังไม่ผูกโรงเรียน";
+    schoolCounts[label] = (schoolCounts[label] || 0) + 1;
+  });
+
+  const dayKeys = [];
+  const dailyMap = {};
+  for (let offset = 13; offset >= 0; offset--) {
+    const date = new Date(Date.now() - offset * 86400000);
+    const key = Utilities.formatDate(date, "Asia/Bangkok", "yyyy-MM-dd");
+    dayKeys.push(key);
+    dailyMap[key] = 0;
+  }
+  registrations.forEach(row => {
+    const raw = row.submissionTimestamp || row.createdTimestamp;
+    if (!raw) return;
+    const date = raw instanceof Date ? raw : new Date(raw);
+    if (isNaN(date.getTime())) return;
+    const key = Utilities.formatDate(date, "Asia/Bangkok", "yyyy-MM-dd");
+    if (Object.prototype.hasOwnProperty.call(dailyMap, key)) dailyMap[key]++;
+  });
+
+  const latestRows = registrations.slice().sort((a, b) =>
+    String(b.lastModifiedTimestamp || b.submissionTimestamp || b.createdTimestamp || "")
+      .localeCompare(String(a.lastModifiedTimestamp || a.submissionTimestamp || a.createdTimestamp || ""))
+  ).slice(0, 100).map(row => {
+    const config = configById[row.competitionCategoryConfigId];
+    return {
+      registrationId: row.registrationId,
+      registrationNumber: row.registrationNumber || row.registrationId,
+      schoolName: schoolById[row.schoolId] || row.schoolId || "ไม่ระบุโรงเรียน",
+      categoryName: config ? (categoryById[config.categoryId] || config.categoryId) : "ไม่ระบุกิจกรรม",
+      status: row.registrationStatus || "UNKNOWN",
+      checkedIn: activeCheckinRegistrationIds.has(row.registrationId),
+      updatedAt: row.lastModifiedTimestamp || row.submissionTimestamp || row.createdTimestamp || ""
+    };
+  });
+
+  return {
+    generatedAt: new Date().toISOString(),
+    scope: canReadTenant ? "TENANT" : "SCHOOL",
+    kpis: {
+      schools: schools.length,
+      participatingSchools: participatingSchoolIds.size,
+      venues: venues.length,
+      categories: categories.length,
+      competitions: competitions.length,
+      registrations: registrations.length,
+      submitted: submitted,
+      approved: approved,
+      checkedIn: activeCheckinRegistrationIds.size,
+      scorecards: scorecards.length,
+      finishedScores: finishedScores
+    },
+    registrationStatus: asSeries(status),
+    competitionStatus: asSeries(countBy(competitions, "status")),
+    scoringStatus: asSeries(countBy(scorecards, "scorecardStatus")),
+    categoryRanking: asSeries(categoryCounts).slice(0, 8),
+    schoolRanking: asSeries(schoolCounts).slice(0, 8),
+    registrationTrend: dayKeys.map(key => ({ date: key, value: dailyMap[key] })),
+    funnel: [
+      { key: "ใบสมัครทั้งหมด", value: registrations.length },
+      { key: "ส่งใบสมัคร", value: submitted },
+      { key: "อนุมัติ", value: approved },
+      { key: "รายงานตัว", value: activeCheckinRegistrationIds.size },
+      { key: "บันทึกคะแนน", value: finishedScores }
+    ],
+    quality: {
+      missingSchool: registrations.filter(row => !schoolById[row.schoolId]).length,
+      missingCategory: registrations.filter(row => !configById[row.competitionCategoryConfigId]).length,
+      pendingReview: (status.SUBMITTED || 0) + (status.UNDER_REVIEW || 0),
+      uncheckedApproved: Math.max(0, approved - activeCheckinRegistrationIds.size)
+    },
+    rows: latestRows
+  };
+}
+
 class DashboardAggregationService {
   constructor(dashRepo) {
     this.dashRepo = dashRepo;

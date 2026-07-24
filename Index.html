@@ -376,6 +376,7 @@
         return action.endsWith('.list') ||
           action === 'competition.workspace.get' ||
           action === 'analytics.dashboard.get' ||
+          action === 'analytics.dashboard.overview' ||
           action === 'operations.checkin.dashboard';
       },
 
@@ -1115,55 +1116,170 @@
       renderDashboardView() {
         const main = document.getElementById('main-content');
         main.innerHTML = `
-          <div class="w-full max-w-4xl space-y-6">
-            <div>
-              <h2 class="text-xl font-bold text-white">แดชบอร์ดระบบข้อมูลหลัก</h2>
-              <p class="text-xs text-slate-400">สรุปภาพรวมและจำนวนสถิติข้อมูลระบบเขตพื้นที่การศึกษา</p>
-            </div>
-            
-            <div class="grid grid-cols-3 gap-6">
-              <div class="p-6 rounded-3xl bg-slate-900/40 border border-slate-800/80 space-y-3 shadow-sm">
-                <span class="material-icons-round text-indigo-400 text-3xl">school</span>
-                <div>
-                  <h3 class="text-sm font-semibold text-white">จำนวนโรงเรียน</h3>
-                  <p class="text-xs text-slate-400" id="dash-schools-count">กำลังโหลด...</p>
-                </div>
+          <div class="w-full max-w-[1500px] space-y-5">
+            <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+              <div>
+                <p class="mb-1 text-[10px] font-bold uppercase tracking-[.22em] text-indigo-400">Executive intelligence</p>
+                <h2 class="text-2xl font-bold text-white sm:text-3xl">ศูนย์บัญชาการข้อมูลการแข่งขัน</h2>
+                <p class="mt-1 text-xs text-slate-400">ติดตามการสมัคร ความพร้อมหน้างาน และผลการดำเนินงานจากข้อมูลจริงในมุมมองเดียว</p>
               </div>
-              <div class="p-6 rounded-3xl bg-slate-900/40 border border-slate-800/80 space-y-3 shadow-sm">
-                <span class="material-icons-round text-purple-400 text-3xl">place</span>
-                <div>
-                  <h3 class="text-sm font-semibold text-white">สนามการแข่งขัน</h3>
-                  <p class="text-xs text-slate-400" id="dash-venues-count">กำลังโหลด...</p>
-                </div>
-              </div>
-              <div class="p-6 rounded-3xl bg-slate-900/40 border border-slate-800/80 space-y-3 shadow-sm">
-                <span class="material-icons-round text-pink-400 text-3xl">category</span>
-                <div>
-                  <h3 class="text-sm font-semibold text-white">หมวดหมู่แข่งขัน</h3>
-                  <p class="text-xs text-slate-400" id="dash-categories-count">กำลังโหลด...</p>
-                </div>
+              <div class="flex items-center gap-2">
+                <span id="dashboard-freshness" class="text-[11px] text-slate-500">กำลังเตรียมข้อมูล...</span>
+                <button onclick="CMPE_UI.loadDashboardStats(true)" class="inline-flex items-center gap-2 rounded-xl border border-slate-700 px-4 py-2.5 text-xs font-semibold text-slate-300 hover:border-indigo-500 hover:text-white"><span class="material-icons-round text-base">refresh</span>รีเฟรช</button>
               </div>
             </div>
+
+            <div id="dashboard-kpis" class="grid grid-cols-2 gap-3 xl:grid-cols-5"></div>
+
+            <div class="grid gap-4 xl:grid-cols-12">
+              <section class="rounded-3xl border border-slate-800 bg-slate-900/35 p-5 xl:col-span-8">
+                <div class="flex items-start justify-between"><div><h3 class="text-sm font-semibold text-white">แนวโน้มใบสมัคร 14 วันล่าสุด</h3><p class="mt-1 text-[11px] text-slate-500">จำนวนใบสมัครที่สร้างหรือส่งในแต่ละวัน</p></div><span class="rounded-full bg-indigo-500/10 px-3 py-1 text-[10px] font-bold text-indigo-300">TREND</span></div>
+                <div id="dashboard-trend-chart" class="mt-5 h-64"></div>
+              </section>
+              <section class="rounded-3xl border border-slate-800 bg-slate-900/35 p-5 xl:col-span-4">
+                <div><h3 class="text-sm font-semibold text-white">สัดส่วนสถานะใบสมัคร</h3><p class="mt-1 text-[11px] text-slate-500">ภาพรวมทุกขั้นตอนของ workflow</p></div>
+                <div id="dashboard-status-donut" class="mt-4"></div>
+              </section>
+            </div>
+
+            <div class="grid gap-4 xl:grid-cols-12">
+              <section class="rounded-3xl border border-slate-800 bg-slate-900/35 p-5 xl:col-span-4"><h3 class="text-sm font-semibold text-white">Conversion Funnel</h3><p class="mt-1 text-[11px] text-slate-500">จากการสมัครจนถึงบันทึกคะแนน</p><div id="dashboard-funnel" class="mt-5 space-y-2.5"></div></section>
+              <section class="rounded-3xl border border-slate-800 bg-slate-900/35 p-5 xl:col-span-4"><h3 class="text-sm font-semibold text-white">กิจกรรมยอดนิยม</h3><p class="mt-1 text-[11px] text-slate-500">อันดับตามจำนวนทีมสมัคร</p><div id="dashboard-category-bars" class="mt-5 space-y-3"></div></section>
+              <section class="rounded-3xl border border-slate-800 bg-slate-900/35 p-5 xl:col-span-4"><h3 class="text-sm font-semibold text-white">โรงเรียนที่มีส่วนร่วมสูง</h3><p class="mt-1 text-[11px] text-slate-500">อันดับตามจำนวนใบสมัคร</p><div id="dashboard-school-bars" class="mt-5 space-y-3"></div></section>
+            </div>
+
+            <div class="grid gap-4 lg:grid-cols-3">
+              <section class="rounded-3xl border border-slate-800 bg-gradient-to-br from-slate-900/60 to-indigo-950/20 p-5 lg:col-span-2"><div class="flex items-center gap-2"><span class="material-icons-round text-amber-400">monitor_heart</span><h3 class="text-sm font-semibold text-white">Operational Health</h3></div><div id="dashboard-quality" class="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4"></div></section>
+              <section class="rounded-3xl border border-slate-800 bg-slate-900/35 p-5"><h3 class="text-sm font-semibold text-white">สถานะการแข่งขัน</h3><div id="dashboard-competition-status" class="mt-4 space-y-3"></div></section>
+            </div>
+
+            <section class="overflow-hidden rounded-3xl border border-slate-800 bg-slate-950/45">
+              <div class="border-b border-slate-800 p-4 sm:p-5">
+                <div class="flex flex-col gap-3 xl:flex-row xl:items-end xl:justify-between">
+                  <div><h3 class="text-sm font-semibold text-white">ทะเบียนใบสมัครเชิงวิเคราะห์</h3><p id="dashboard-table-count" class="mt-1 text-[11px] text-slate-500">กำลังโหลดข้อมูล</p></div>
+                  <div class="grid gap-2 sm:grid-cols-3">
+                    <input id="dashboard-table-search" oninput="CMPE_UI.filterDashboardTable()" type="search" placeholder="ค้นหาเลขที่ โรงเรียน กิจกรรม" class="rounded-xl border border-slate-800 bg-slate-950 px-3 py-2.5 text-xs text-white outline-none focus:border-indigo-500">
+                    <select id="dashboard-table-status" onchange="CMPE_UI.filterDashboardTable()" class="rounded-xl border border-slate-800 bg-slate-950 px-3 py-2.5 text-xs text-slate-300 outline-none"><option value="">ทุกสถานะ</option><option value="SUBMITTED">ส่งใบสมัครแล้ว</option><option value="UNDER_REVIEW">กำลังตรวจสอบ</option><option value="APPROVED">อนุมัติแล้ว</option><option value="CHECKED_IN">รายงานตัวแล้ว</option><option value="COMPLETED">เสร็จสิ้น</option></select>
+                    <select id="dashboard-table-sort" onchange="CMPE_UI.filterDashboardTable()" class="rounded-xl border border-slate-800 bg-slate-950 px-3 py-2.5 text-xs text-slate-300 outline-none"><option value="LATEST">อัปเดตล่าสุด</option><option value="SCHOOL">ชื่อโรงเรียน</option><option value="ACTIVITY">ชื่อกิจกรรม</option><option value="STATUS">สถานะ</option></select>
+                  </div>
+                </div>
+              </div>
+              <div class="overflow-x-auto"><table class="w-full min-w-[900px] text-left text-sm"><thead class="bg-slate-900/80 text-[10px] uppercase tracking-wider text-slate-500"><tr><th class="px-5 py-3">ใบสมัคร</th><th class="px-5 py-3">โรงเรียน</th><th class="px-5 py-3">กิจกรรม</th><th class="px-5 py-3">สถานะ</th><th class="px-5 py-3">หน้างาน</th><th class="px-5 py-3 text-right">อัปเดต</th></tr></thead><tbody id="dashboard-table-body" class="divide-y divide-slate-800"></tbody></table></div>
+              <div id="dashboard-table-pagination" class="border-t border-slate-800 px-5 py-4"></div>
+            </section>
           </div>
         `;
 
+        this.dashboardTablePage = 1;
         this.loadDashboardStats();
       },
 
-      async loadDashboardStats() {
+      async loadDashboardStats(forceRefresh) {
+        if (forceRefresh) CMPE_API.invalidateReadCache();
         try {
-          const [schools, venues, categories] = await Promise.all([
-            CMPE_API.call('master.schools.list', { query: "" }),
-            CMPE_API.call('master.venues.list'),
-            CMPE_API.call('master.categories.list')
-          ]);
-          
-          document.getElementById('dash-schools-count').textContent = `${schools.length} โรงเรียน`;
-          document.getElementById('dash-venues-count').textContent = `${venues.length} แห่ง`;
-          document.getElementById('dash-categories-count').textContent = `${categories.length} รายการ`;
+          const data = await CMPE_API.call('analytics.dashboard.overview', {});
+          if (!document.getElementById('dashboard-kpis')) return;
+          this.dashboardData = data;
+          this.dashboardRows = data.rows || [];
+          this.renderDashboardKpis(data.kpis || {});
+          this.renderDashboardTrend(data.registrationTrend || []);
+          this.renderDashboardDonut(data.registrationStatus || []);
+          this.renderDashboardFunnel(data.funnel || []);
+          this.renderDashboardBars('dashboard-category-bars', data.categoryRanking || [], 'from-fuchsia-500 to-pink-400');
+          this.renderDashboardBars('dashboard-school-bars', data.schoolRanking || [], 'from-indigo-500 to-cyan-400');
+          this.renderDashboardQuality(data.quality || {});
+          this.renderDashboardCompetitionStatus(data.competitionStatus || []);
+          this.filterDashboardTable();
+          const generated = new Date(data.generatedAt);
+          document.getElementById('dashboard-freshness').textContent = `อัปเดต ${generated.toLocaleTimeString('th-TH', {hour:'2-digit', minute:'2-digit'})} น. · ${data.scope === 'TENANT' ? 'ทั้งเขตพื้นที่' : 'เฉพาะโรงเรียน'}`;
         } catch (e) {
-          this.showToast('ดึงสถิติแดชบอร์ดไม่สำเร็จ', 'error');
+          this.showToast(e.message || 'ดึงข้อมูล BI Dashboard ไม่สำเร็จ', 'error');
         }
+      },
+
+      renderDashboardKpis(kpis) {
+        const cards = [
+          ['groups', 'ใบสมัครทั้งหมด', kpis.registrations || 0, 'text-indigo-300', `${kpis.submitted || 0} ส่งเข้าระบบ`],
+          ['verified', 'อนุมัติแล้ว', kpis.approved || 0, 'text-emerald-300', `${this.dashboardPercent(kpis.approved, kpis.registrations)}% ของทั้งหมด`],
+          ['how_to_reg', 'รายงานตัวแล้ว', kpis.checkedIn || 0, 'text-cyan-300', `${this.dashboardPercent(kpis.checkedIn, kpis.approved)}% ของทีมที่อนุมัติ`],
+          ['school', 'โรงเรียนเข้าร่วม', kpis.participatingSchools || 0, 'text-fuchsia-300', `จาก ${kpis.schools || 0} โรงเรียน`],
+          ['fact_check', 'คะแนนเสร็จสิ้น', kpis.finishedScores || 0, 'text-amber-300', `${this.dashboardPercent(kpis.finishedScores, kpis.scorecards)}% ของ scorecard`]
+        ];
+        document.getElementById('dashboard-kpis').innerHTML = cards.map(card => `<article class="group relative overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/45 p-4 transition hover:-translate-y-0.5 hover:border-indigo-500/40"><div class="absolute -right-5 -top-5 h-20 w-20 rounded-full bg-indigo-500/5 blur-xl"></div><div class="flex items-start justify-between"><span class="material-icons-round ${card[3]}">${card[0]}</span><span class="text-2xl font-bold text-white">${Number(card[2]).toLocaleString('th-TH')}</span></div><p class="mt-3 text-xs font-semibold text-slate-300">${card[1]}</p><p class="mt-1 text-[10px] text-slate-500">${card[4]}</p></article>`).join('');
+      },
+
+      dashboardPercent(value, total) {
+        return total ? Math.round(Number(value || 0) * 100 / Number(total)) : 0;
+      },
+
+      renderDashboardTrend(series) {
+        const target = document.getElementById('dashboard-trend-chart');
+        const width = 900, height = 230, padX = 26, padY = 22;
+        const max = Math.max(1, ...series.map(item => Number(item.value || 0)));
+        const points = series.map((item, index) => {
+          const x = padX + index * ((width - padX * 2) / Math.max(1, series.length - 1));
+          const y = height - padY - Number(item.value || 0) / max * (height - padY * 2);
+          return { x, y, item };
+        });
+        const line = points.map(point => `${point.x},${point.y}`).join(' ');
+        const area = points.length ? `${padX},${height-padY} ${line} ${width-padX},${height-padY}` : '';
+        target.innerHTML = `<svg viewBox="0 0 ${width} ${height}" class="h-full w-full overflow-visible" role="img" aria-label="กราฟแนวโน้มใบสมัคร"><defs><linearGradient id="dashArea" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#818cf8" stop-opacity=".36"/><stop offset="1" stop-color="#818cf8" stop-opacity="0"/></linearGradient></defs>${[0,.25,.5,.75,1].map(r=>`<line x1="${padX}" y1="${padY+r*(height-padY*2)}" x2="${width-padX}" y2="${padY+r*(height-padY*2)}" stroke="#1e293b" stroke-width="1"/>`).join('')}<polygon points="${area}" fill="url(#dashArea)"/><polyline points="${line}" fill="none" stroke="#818cf8" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>${points.map((p,i)=>`<circle cx="${p.x}" cy="${p.y}" r="5" fill="#020617" stroke="#a5b4fc" stroke-width="3"><title>${p.item.date}: ${p.item.value} ใบสมัคร</title></circle>${i%2===0?`<text x="${p.x}" y="${height-3}" text-anchor="middle" fill="#64748b" font-size="9">${p.item.date.slice(5)}</text>`:''}`).join('')}</svg>`;
+      },
+
+      renderDashboardDonut(series) {
+        const colors = ['#818cf8','#34d399','#f59e0b','#f472b6','#22d3ee','#fb7185','#94a3b8'];
+        const total = series.reduce((sum, item) => sum + Number(item.value || 0), 0);
+        let offset = 0;
+        const rings = series.map((item, index) => {
+          const length = total ? Number(item.value) / total * 100 : 0;
+          const ring = `<circle cx="70" cy="70" r="50" fill="none" stroke="${colors[index%colors.length]}" stroke-width="16" pathLength="100" stroke-dasharray="${length} ${100-length}" stroke-dashoffset="${-offset}" transform="rotate(-90 70 70)"><title>${this.dashboardStatusLabel(item.key)} ${item.value}</title></circle>`;
+          offset += length; return ring;
+        }).join('');
+        document.getElementById('dashboard-status-donut').innerHTML = `<div class="grid items-center gap-4 sm:grid-cols-[150px_1fr] xl:grid-cols-1 2xl:grid-cols-[150px_1fr]"><div class="relative mx-auto h-36 w-36"><svg viewBox="0 0 140 140" class="h-full w-full"><circle cx="70" cy="70" r="50" fill="none" stroke="#1e293b" stroke-width="16"/>${rings}</svg><div class="absolute inset-0 flex flex-col items-center justify-center"><span class="text-2xl font-bold text-white">${total}</span><span class="text-[9px] text-slate-500">ใบสมัคร</span></div></div><div class="space-y-2">${series.slice(0,7).map((item,index)=>`<div class="flex items-center justify-between gap-3 text-[11px]"><span class="flex min-w-0 items-center gap-2 text-slate-400"><i class="h-2 w-2 shrink-0 rounded-full" style="background:${colors[index%colors.length]}"></i><span class="truncate">${this.dashboardStatusLabel(item.key)}</span></span><strong class="text-slate-200">${item.value}</strong></div>`).join('')}</div></div>`;
+      },
+
+      renderDashboardFunnel(series) {
+        const max = Math.max(1, ...series.map(item => Number(item.value || 0)));
+        document.getElementById('dashboard-funnel').innerHTML = series.map((item,index) => { const width=Math.max(22, Number(item.value||0)/max*100); return `<div class="text-center"><div class="mx-auto flex h-8 items-center justify-center rounded-lg bg-gradient-to-r from-indigo-600 to-fuchsia-500 text-[10px] font-bold text-white shadow-lg shadow-indigo-950/20" style="width:${width}%">${item.value.toLocaleString ? item.value.toLocaleString('th-TH') : item.value}</div><p class="mt-1 text-[10px] text-slate-500">${this.escapeHtml(item.key)}${index ? ` · ${this.dashboardPercent(item.value,series[index-1].value)}%` : ''}</p></div>`; }).join('');
+      },
+
+      renderDashboardBars(targetId, series, gradient) {
+        const max = Math.max(1, ...series.map(item => Number(item.value || 0)));
+        document.getElementById(targetId).innerHTML = series.length ? series.slice(0,6).map((item,index)=>`<div><div class="mb-1 flex items-center justify-between gap-3 text-[10px]"><span class="truncate text-slate-400"><b class="mr-2 text-slate-600">${index+1}</b>${this.escapeHtml(item.key)}</span><strong class="text-slate-200">${item.value}</strong></div><div class="h-1.5 overflow-hidden rounded-full bg-slate-800"><div class="h-full rounded-full bg-gradient-to-r ${gradient}" style="width:${Number(item.value)/max*100}%"></div></div></div>`).join('') : '<p class="py-8 text-center text-xs text-slate-600">ยังไม่มีข้อมูลเพียงพอ</p>';
+      },
+
+      renderDashboardQuality(quality) {
+        const cards=[['pending_actions','รอตรวจสอบ',quality.pendingReview||0,'text-amber-300'],['person_pin_circle','อนุมัติแต่ยังไม่มา',quality.uncheckedApproved||0,'text-cyan-300'],['domain_disabled','ไม่พบโรงเรียน',quality.missingSchool||0,'text-rose-300'],['category','ไม่พบหมวด',quality.missingCategory||0,'text-fuchsia-300']];
+        document.getElementById('dashboard-quality').innerHTML=cards.map(card=>`<div class="rounded-2xl border border-slate-800 bg-slate-950/50 p-3"><span class="material-icons-round text-lg ${card[3]}">${card[0]}</span><p class="mt-2 text-xl font-bold text-white">${card[2]}</p><p class="text-[10px] text-slate-500">${card[1]}</p></div>`).join('');
+      },
+
+      renderDashboardCompetitionStatus(series) {
+        const total=series.reduce((sum,item)=>sum+Number(item.value||0),0);
+        document.getElementById('dashboard-competition-status').innerHTML=series.length?series.map(item=>`<div><div class="flex justify-between text-[10px]"><span class="text-slate-400">${this.dashboardStatusLabel(item.key)}</span><b class="text-slate-200">${item.value}</b></div><div class="mt-1 h-1.5 overflow-hidden rounded-full bg-slate-800"><div class="h-full rounded-full bg-emerald-400" style="width:${this.dashboardPercent(item.value,total)}%"></div></div></div>`).join(''):'<p class="py-6 text-center text-xs text-slate-600">ยังไม่มีการแข่งขัน</p>';
+      },
+
+      dashboardStatusLabel(status) {
+        return ({DRAFT:'ฉบับร่าง',SUBMITTED:'ส่งใบสมัครแล้ว',UNDER_REVIEW:'กำลังตรวจสอบ',REVISION_REQUIRED:'รอแก้ไข',APPROVED:'อนุมัติแล้ว',REJECTED:'ไม่ผ่าน',CHECKED_IN:'รายงานตัวแล้ว',COMPETED:'แข่งขันแล้ว',COMPLETED:'เสร็จสิ้น',CONFIGURED:'ตั้งค่าแล้ว',REGISTRATION_OPEN:'เปิดรับสมัคร',REGISTRATION_CLOSED:'ปิดรับสมัคร',ARCHIVED:'เก็บถาวร',VERIFIED:'ตรวจสอบแล้ว',HARD_LOCKED:'ล็อกผลแล้ว',UNKNOWN:'ไม่ระบุ'})[status] || status || 'ไม่ระบุ';
+      },
+
+      filterDashboardTable() {
+        if (!document.getElementById('dashboard-table-body')) return;
+        const query=String(document.getElementById('dashboard-table-search')?.value||'').trim().toLowerCase();
+        const status=document.getElementById('dashboard-table-status')?.value||'';
+        const sort=document.getElementById('dashboard-table-sort')?.value||'LATEST';
+        let rows=(this.dashboardRows||[]).filter(row=>(!status||row.status===status)&&(!query||[row.registrationNumber,row.schoolName,row.categoryName].some(value=>String(value||'').toLowerCase().includes(query))));
+        rows.sort((a,b)=>sort==='SCHOOL'?a.schoolName.localeCompare(b.schoolName,'th'):sort==='ACTIVITY'?a.categoryName.localeCompare(b.categoryName,'th'):sort==='STATUS'?a.status.localeCompare(b.status):String(b.updatedAt).localeCompare(String(a.updatedAt)));
+        const pageSize=10, pages=Math.max(1,Math.ceil(rows.length/pageSize));
+        this.dashboardTablePage=Math.min(this.dashboardTablePage||1,pages);
+        const visible=rows.slice((this.dashboardTablePage-1)*pageSize,this.dashboardTablePage*pageSize);
+        document.getElementById('dashboard-table-count').textContent=`พบ ${rows.length} รายการ · แสดงข้อมูลล่าสุดสูงสุด 100 รายการ`;
+        document.getElementById('dashboard-table-body').innerHTML=visible.length?visible.map(row=>`<tr class="hover:bg-slate-900/50"><td class="px-5 py-3 font-semibold text-indigo-300">${this.escapeHtml(row.registrationNumber)}</td><td class="px-5 py-3 text-slate-200">${this.escapeHtml(row.schoolName)}</td><td class="px-5 py-3 text-slate-400">${this.escapeHtml(row.categoryName)}</td><td class="px-5 py-3"><span class="rounded-full border border-indigo-500/20 bg-indigo-500/10 px-2.5 py-1 text-[10px] text-indigo-300">${this.escapeHtml(this.dashboardStatusLabel(row.status))}</span></td><td class="px-5 py-3">${row.checkedIn?'<span class="text-xs text-emerald-300">✓ รายงานตัวแล้ว</span>':'<span class="text-xs text-slate-600">ยังไม่รายงานตัว</span>'}</td><td class="px-5 py-3 text-right text-[10px] text-slate-500">${row.updatedAt?new Date(row.updatedAt).toLocaleString('th-TH',{dateStyle:'short',timeStyle:'short'}):'—'}</td></tr>`).join(''):`<tr><td colspan="6" class="px-5 py-12 text-center text-sm text-slate-600">ไม่พบข้อมูลตามเงื่อนไข</td></tr>`;
+        document.getElementById('dashboard-table-pagination').innerHTML=`<div class="flex items-center justify-between"><button onclick="CMPE_UI.changeDashboardTablePage(-1)" ${this.dashboardTablePage<=1?'disabled':''} class="rounded-lg border border-slate-700 px-3 py-2 text-xs disabled:opacity-30">ก่อนหน้า</button><span class="text-[11px] text-slate-500">หน้า ${this.dashboardTablePage} / ${pages}</span><button onclick="CMPE_UI.changeDashboardTablePage(1)" ${this.dashboardTablePage>=pages?'disabled':''} class="rounded-lg border border-slate-700 px-3 py-2 text-xs disabled:opacity-30">ถัดไป</button></div>`;
+      },
+
+      changeDashboardTablePage(delta) {
+        this.dashboardTablePage=Math.max(1,(this.dashboardTablePage||1)+delta);
+        this.filterDashboardTable();
       },
 
       renderNotificationInboxView() {

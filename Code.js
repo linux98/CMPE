@@ -1593,6 +1593,18 @@ function apiDispatcher(requestEnvelope) {
         return CMPE_UTILITIES.successEnvelope(dash, reqId);
       }
 
+      if (action === "analytics.dashboard.overview") {
+        if (actor.permissions.indexOf("dashboard.readTenant") === -1 && actor.permissions.indexOf("dashboard.readOwnSchool") === -1) {
+          return CMPE_UTILITIES.errorEnvelope("ERR_UNAUTHORIZED", "Missing dashboard read permission", [], reqId);
+        }
+        const scope = actor.permissions.indexOf("dashboard.readTenant") !== -1
+          ? "TENANT" : ("SCHOOL:" + (actor.schoolId || ""));
+        const overview = cachedCatalogRead_("analytics.dashboard.overview:" + scope, tenantId, function() {
+          return buildExecutiveDashboard_(actor);
+        }, 60);
+        return CMPE_UTILITIES.successEnvelope(overview, reqId);
+      }
+
       if (action === "analytics.leaderboard.schoolMedals") {
         if (actor.permissions.indexOf("leaderboard.readInternal") === -1) {
           return CMPE_UTILITIES.errorEnvelope("ERR_UNAUTHORIZED", "Missing leaderboard read permission", [], reqId);
