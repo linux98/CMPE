@@ -945,8 +945,33 @@ function apiDispatcher(requestEnvelope) {
         return CMPE_UTILITIES.successEnvelope(canonicalCompetitions, reqId);
       }
       if (action === "competition.workspace.get") {
-        const competition = compRepo.findById(payload.competitionId, tenantId);
-        if (!competition) {
+        const workspace = cachedCatalogRead_("competition.workspace.get:" + payload.competitionId, tenantId, function() {
+          const competition = compRepo.findById(payload.competitionId, tenantId);
+          if (!competition) return null;
+          const rounds = roundRepo.findByCompetition(payload.competitionId);
+          const categoryConfigs = catConfigRepo.findByCompetition(payload.competitionId);
+          const registrationWindows = windowRepo.findByCompetition(payload.competitionId);
+          const readiness = readinessSvc.checkReadiness(payload.competitionId, actor);
+          const categories = new CompetitionCategoryRepository().findByTenant(tenantId);
+          const levels = new EducationLevelRepository().findAll();
+          const categoryMap = {};
+          const levelMap = {};
+          categories.forEach(function(item) {
+            categoryMap[item.categoryId] = item.nameTh || item.nameEn || item.categoryCode;
+          });
+          levels.forEach(function(item) {
+            levelMap[item.educationLevelId] = item.nameTh || item.nameEn || item.levelCode;
+          });
+          return {
+            competition: competition,
+            rounds: rounds,
+            categoryConfigs: categoryConfigs,
+            registrationWindows: registrationWindows,
+            readiness: readiness,
+            lookups: { categories: categoryMap, levels: levelMap }
+          };
+        }, 120);
+        if (!workspace) {
           return CMPE_UTILITIES.errorEnvelope(
             "ERR_COMP_NOT_FOUND",
             "Competition was not found in this tenant.",
@@ -954,28 +979,7 @@ function apiDispatcher(requestEnvelope) {
             reqId
           );
         }
-        const rounds = roundRepo.findByCompetition(payload.competitionId);
-        const categoryConfigs = catConfigRepo.findByCompetition(payload.competitionId);
-        const registrationWindows = windowRepo.findByCompetition(payload.competitionId);
-        const readiness = readinessSvc.checkReadiness(payload.competitionId, actor);
-        const categories = new CompetitionCategoryRepository().findByTenant(tenantId);
-        const levels = new EducationLevelRepository().findAll();
-        const categoryMap = {};
-        const levelMap = {};
-        categories.forEach(function(item) {
-          categoryMap[item.categoryId] = item.nameTh || item.nameEn || item.categoryCode;
-        });
-        levels.forEach(function(item) {
-          levelMap[item.educationLevelId] = item.nameTh || item.nameEn || item.levelCode;
-        });
-        return CMPE_UTILITIES.successEnvelope({
-          competition: competition,
-          rounds: rounds,
-          categoryConfigs: categoryConfigs,
-          registrationWindows: registrationWindows,
-          readiness: readiness,
-          lookups: { categories: categoryMap, levels: levelMap }
-        }, reqId);
+        return CMPE_UTILITIES.successEnvelope(workspace, reqId);
       }
       if (action === "competition.create") {
         if (actor.permissions.indexOf("competition.create") === -1) {
@@ -1070,7 +1074,9 @@ function apiDispatcher(requestEnvelope) {
       
       // 5. configuration.scoreTemplates.* endpoints
       if (action === "configuration.scoreTemplates.list") {
-        return CMPE_UTILITIES.successEnvelope(scoreTempRepo.findByTenant(tenantId), reqId);
+        return CMPE_UTILITIES.successEnvelope(cachedCatalogRead_("configuration.scoreTemplates.list", tenantId, function() {
+          return scoreTempRepo.findByTenant(tenantId);
+        }, 120), reqId);
       }
       if (action === "configuration.scoreTemplates.create") {
         if (actor.permissions.indexOf("scoreTemplate.manage") === -1) {
@@ -1098,7 +1104,9 @@ function apiDispatcher(requestEnvelope) {
       
       // 7. configuration.quotaRules.* endpoints
       if (action === "configuration.quotaRules.list") {
-        return CMPE_UTILITIES.successEnvelope(new QuotaRuleRepository().findByTenant(tenantId), reqId);
+        return CMPE_UTILITIES.successEnvelope(cachedCatalogRead_("configuration.quotaRules.list", tenantId, function() {
+          return new QuotaRuleRepository().findByTenant(tenantId);
+        }, 120), reqId);
       }
       if (action === "configuration.quotaRules.create") {
         if (actor.permissions.indexOf("quotaRule.manage") === -1) {
@@ -1124,7 +1132,9 @@ function apiDispatcher(requestEnvelope) {
       
       // 9. configuration.medalRules.* endpoints
       if (action === "configuration.medalRules.list") {
-        return CMPE_UTILITIES.successEnvelope(new MedalRuleRepository().findByTenant(tenantId), reqId);
+        return CMPE_UTILITIES.successEnvelope(cachedCatalogRead_("configuration.medalRules.list", tenantId, function() {
+          return new MedalRuleRepository().findByTenant(tenantId);
+        }, 120), reqId);
       }
       if (action === "configuration.medalRules.create") {
         if (actor.permissions.indexOf("medalRule.manage") === -1) {
@@ -1317,11 +1327,15 @@ function apiDispatcher(requestEnvelope) {
       }
 
       if (action === "operations.judges.list") {
-        return CMPE_UTILITIES.successEnvelope(judgeRepo.findAll(tenantId), reqId);
+        return CMPE_UTILITIES.successEnvelope(cachedCatalogRead_("operations.judges.list", tenantId, function() {
+          return judgeRepo.findAll(tenantId);
+        }, 120), reqId);
       }
 
       if (action === "operations.assignments.list") {
-        return CMPE_UTILITIES.successEnvelope(assignmentRepo.findAll(tenantId), reqId);
+        return CMPE_UTILITIES.successEnvelope(cachedCatalogRead_("operations.assignments.list", tenantId, function() {
+          return assignmentRepo.findAll(tenantId);
+        }, 60), reqId);
       }
       
       if (action === "operations.assignments.create") {

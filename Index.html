@@ -305,7 +305,7 @@
       },
 
       start(action) {
-        const token = { button: this.resolveActionButton(), overlay: false };
+        const token = { button: this.resolveActionButton(), overlay: false, finished: false, delayTimer: null };
         token.overlay = !token.button;
         this.setButtonLoading(token.button);
         this.activeRequests += 1;
@@ -316,12 +316,13 @@
           this.finishTimer = null;
         }
         this.overlayRequests += 1;
-        const overlay = document.getElementById('global-loading-overlay');
         document.getElementById('global-loading-label').textContent = this.labelFor(action);
         document.getElementById('global-loading-detail').textContent =
           continuingBatch ? 'เสร็จหนึ่งขั้นตอนแล้ว กำลังทำขั้นตอนถัดไป' : 'กำลังเตรียมข้อมูลสำหรับหน้าจอนี้';
-        if (this.overlayRequests === 1) {
-          if (!continuingBatch) {
+        token.delayTimer = window.setTimeout(() => {
+          if (token.finished || this.overlayRequests === 0) return;
+          const overlay = document.getElementById('global-loading-overlay');
+          if (overlay.classList.contains('hidden')) {
             this.startedAt = Date.now();
             this.percent = 4;
             overlay.classList.remove('hidden');
@@ -337,7 +338,7 @@
               this.render();
             }, 250);
           }
-        }
+        }, 650);
         return token;
       },
 
@@ -345,8 +346,18 @@
         this.restoreButton(token && token.button);
         this.activeRequests = Math.max(0, this.activeRequests - 1);
         if (!token || !token.overlay) return;
+        token.finished = true;
+        if (token.delayTimer) window.clearTimeout(token.delayTimer);
         this.overlayRequests = Math.max(0, this.overlayRequests - 1);
         if (this.overlayRequests > 0) return;
+        const overlay = document.getElementById('global-loading-overlay');
+        if (overlay.classList.contains('hidden')) {
+          if (this.timer) window.clearInterval(this.timer);
+          this.timer = null;
+          this.percent = 0;
+          this.render();
+          return;
+        }
         document.getElementById('global-loading-detail').textContent = 'กำลังตรวจสอบว่ามีข้อมูลส่วนถัดไปหรือไม่';
         this.finishTimer = window.setTimeout(() => {
           if (this.overlayRequests !== 0) return;
@@ -371,9 +382,13 @@
 
     const CMPE_API = {
       dataCache: new Map(),
+      inFlight: new Map(),
+      cacheHydrated: false,
+      cacheVersion: 'cmpe-cache-v3',
 
       isCacheable(action) {
         return action.endsWith('.list') ||
+          (!action.startsWith('auth.') && action.endsWith('.get')) ||
           action === 'competition.workspace.get' ||
           action === 'analytics.dashboard.get' ||
           action === 'analytics.dashboard.overview' ||
@@ -384,18 +399,83 @@
         return `${CMPE_STATE.tenantId}:${action}:${JSON.stringify(payload || {})}`;
       },
 
+      cacheTtl(action) {
+        if (action.startsWith('master.') || action === 'branding.get') return 300000;
+        if (action === 'competition.list') return 180000;
+        return 60000;
+      },
+
+      hydrateCache() {
+        if (this.cacheHydrated) return;
+        this.cacheHydrated = true;
+        try {
+          const stored = JSON.parse(sessionStorage.getItem(this.cacheVersion) || '{}');
+          Object.keys(stored).forEach(key => {
+            const item = stored[key];
+            if (item && Date.now() - item.storedAt < 1800000) this.dataCache.set(key, item);
+          });
+        } catch (error) {}
+      },
+
+      persistCache() {
+        try {
+          const stored = {};
+          this.dataCache.forEach((value, key) => {
+            if (Date.now() - value.storedAt < 1800000) stored[key] = value;
+          });
+          sessionStorage.setItem(this.cacheVersion, JSON.stringify(stored));
+        } catch (error) {}
+      },
+
       invalidateReadCache() {
         this.dataCache.clear();
+        try { sessionStorage.removeItem(this.cacheVersion); } catch (error) {}
       },
 
       async call(action, payload = {}) {
         const cacheable = this.isCacheable(action);
         const key = cacheable ? this.cacheKey(action, payload) : '';
+        this.hydrateCache();
         const cached = cacheable ? this.dataCache.get(key) : null;
-        if (cached && Date.now() - cached.storedAt < 60000) {
+        const age = cached ? Date.now() - cached.storedAt : Infinity;
+        if (cached && age < this.cacheTtl(action)) {
           return cached.data;
         }
-        const loadingToken = CMPE_LOADING.start(action);
+        if (cached && age < 1800000) {
+          if (!this.inFlight.has(key)) {
+            const refresh = this.networkCall(action, payload, { silent: true });
+            refresh.then(() => this.inFlight.delete(key), () => this.inFlight.delete(key));
+            this.inFlight.set(key, refresh);
+            refresh.catch(() => {});
+          }
+          return cached.data;
+        }
+        if (cacheable && this.inFlight.has(key)) return this.inFlight.get(key);
+        const request = this.networkCall(action, payload, { silent: false });
+        if (cacheable) {
+          this.inFlight.set(key, request);
+          request.then(() => this.inFlight.delete(key), () => this.inFlight.delete(key));
+        }
+        return request;
+      },
+
+      prefetch(action, payload = {}) {
+        if (!this.isCacheable(action)) return Promise.resolve();
+        this.hydrateCache();
+        const key = this.cacheKey(action, payload);
+        const cached = this.dataCache.get(key);
+        if (cached && Date.now() - cached.storedAt < this.cacheTtl(action)) return Promise.resolve(cached.data);
+        if (this.inFlight.has(key)) return this.inFlight.get(key);
+        const request = this.networkCall(action, payload, { silent: true });
+        this.inFlight.set(key, request);
+        request.then(() => this.inFlight.delete(key), () => this.inFlight.delete(key));
+        return request;
+      },
+
+      async networkCall(action, payload = {}, options = {}) {
+        const cacheable = this.isCacheable(action);
+        const key = cacheable ? this.cacheKey(action, payload) : '';
+        const loadingToken = options.silent ? null : CMPE_LOADING.start(action);
         try {
           const data = await new Promise((resolve, reject) => {
             let settled = false;
@@ -448,6 +528,7 @@
           });
           if (cacheable) {
             this.dataCache.set(key, { data: data, storedAt: Date.now() });
+            this.persistCache();
           } else if (!action.startsWith('auth.') &&
                      !action.includes('.preview') &&
                      !action.includes('.validate')) {
@@ -455,7 +536,7 @@
           }
           return data;
         } finally {
-          CMPE_LOADING.finish(loadingToken);
+          if (loadingToken) CMPE_LOADING.finish(loadingToken);
         }
       }
     };
@@ -470,6 +551,7 @@
             CMPE_STATE.user = session;
             this.setupSidebar(session.permissions || []);
             this.updateHeaderStatus(session.username || session.userId);
+            this.schedulePrefetch(session.permissions || []);
             if (!window.location.hash || window.location.hash === '#login') {
               this.navigateTo('dashboard');
             } else {
@@ -483,6 +565,28 @@
           }
         }
         this.route();
+      },
+
+      schedulePrefetch(permissions) {
+        const queue = [
+          ['branding.get', {}],
+          ['master.academicYears.list', {}],
+          ['master.categories.list', {}],
+          ['master.educationLevels.list', {}],
+          ['master.venues.list', {}],
+          ['competition.list', {}],
+          ['analytics.dashboard.overview', {}]
+        ];
+        if (permissions.includes('school.read')) queue.push(['master.schools.list', { query: '' }]);
+        if (permissions.includes('registration.readTenant') || permissions.includes('registration.readOwnSchool')) queue.push(['registration.list', {}]);
+        if (permissions.includes('judge.read')) queue.push(['operations.judges.list', {}]);
+        const run = async () => {
+          for (const item of queue) {
+            try { await CMPE_API.prefetch(item[0], item[1]); } catch (error) {}
+          }
+        };
+        if ('requestIdleCallback' in window) window.requestIdleCallback(run, { timeout: 1800 });
+        else window.setTimeout(run, 600);
       },
 
       async loadBranding(forceRefresh) {
@@ -3395,6 +3499,7 @@
           
           this.setupSidebar(data.user.permissions);
           this.updateHeaderStatus(data.user.username);
+          this.schedulePrefetch(data.user.permissions || []);
           this.navigateTo('dashboard');
         } catch (err) {
           this.showToast(err.message || 'การเข้าสู่ระบบล้มเหลว', 'error');
@@ -3407,6 +3512,7 @@
         } catch (e) {}
         
         CMPE_STATE.sessionToken = null;
+        CMPE_API.invalidateReadCache();
         localStorage.removeItem('sessionToken');
         this.showToast('ออกจากระบบเรียบร้อยแล้ว', 'info');
         this.navigateTo('login');
