@@ -143,14 +143,6 @@ class RegistrationSubmissionService {
   }
 
   submitRegistration(registrationId, expectedRowVersion, actor) {
-    const lock = LockService.getScriptLock();
-    try {
-      lock.waitLock(15000);
-    } catch (e) {
-      throw new Error("Lock contention on registration submission");
-    }
-
-    try {
       // 1. Authoritative Load
       const regRow = this.regRepo.findById(registrationId, actor.tenantId);
       if (!regRow) throw new Error("ERR_REG_NOT_FOUND");
@@ -164,7 +156,17 @@ class RegistrationSubmissionService {
       const members = this.memberRepo.findByRegistration(registrationId, actor.tenantId);
       
       // 2. Perform duplicate participant checks
-      const duplicates = this.duplicateSvc.detectDuplicates(members, reg.competitionId, actor.tenantId);
+      const workflowPolicies = typeof getWorkflowPolicies_ === "function"
+        ? getWorkflowPolicies_(actor.tenantId, reg.competitionId, reg.competitionCategoryConfigId)
+        : { registration: { allowMultipleActivities: false } };
+      const duplicates = this.duplicateSvc.detectDuplicates(
+        members,
+        reg.competitionId,
+        actor.tenantId,
+        workflowPolicies.registration.allowMultipleActivities
+          ? reg.competitionCategoryConfigId
+          : ""
+      );
       if (duplicates.hasDuplicates) {
         throw new Error("ERR_DUPLICATE_CONTESTANT: One or more contestants are already registered in this competition.");
       }
@@ -186,6 +188,31 @@ class RegistrationSubmissionService {
         }
       }
 
+      // 4.1 Enforce the configured team size at submission time. Drafts may be
+      // incomplete, but an official submission must satisfy the canonical
+      // category configuration.
+      const config = this.categoryConfigRepo.findById(
+        reg.competitionCategoryConfigId,
+        actor.tenantId
+      );
+      const coaches = this.coachRepo.findByRegistration(registrationId, actor.tenantId);
+      const minMembers = config && Number(config.participantMinOverride || 0);
+      const maxMembers = config && Number(config.participantMaxOverride || 0);
+      const minCoaches = config && Number(config.coachMinOverride || 0);
+      const maxCoaches = config && Number(config.coachMaxOverride || 0);
+      if (minMembers > 0 && members.length < minMembers) {
+        throw new Error("ERR_TEAM_SIZE_MIN: The registration requires at least " + minMembers + " students.");
+      }
+      if (maxMembers > 0 && members.length > maxMembers) {
+        throw new Error("ERR_TEAM_SIZE_MAX: The registration allows at most " + maxMembers + " students.");
+      }
+      if (minCoaches > 0 && coaches.length < minCoaches) {
+        throw new Error("ERR_COACH_SIZE_MIN: The registration requires at least " + minCoaches + " coaches.");
+      }
+      if (maxCoaches > 0 && coaches.length > maxCoaches) {
+        throw new Error("ERR_COACH_SIZE_MAX: The registration allows at most " + maxCoaches + " coaches.");
+      }
+
       // 5. Transition to SUBMITTED
       reg.registrationStatus = "SUBMITTED";
       reg.submissionTimestamp = new Date().toISOString();
@@ -204,9 +231,6 @@ class RegistrationSubmissionService {
       this.historyRepo.create(hist, actor);
 
       return reg;
-    } finally {
-      lock.releaseLock();
-    }
   }
 }
 
@@ -249,7 +273,7 @@ class DuplicateDetectionService {
     this.regRepo = regRepo;
   }
 
-  detectDuplicates(newMembers, competitionId, tenantId) {
+  detectDuplicates(newMembers, competitionId, tenantId, categoryConfigId) {
     const sheet = this.memberRepo.getSheet();
     if (sheet.getLastRow() <= 1) return { hasDuplicates: false, duplicateNames: [] };
     
@@ -270,7 +294,9 @@ class DuplicateDetectionService {
     const activeRegIds = new Set();
     
     regData.forEach(row => {
-      if (row[regHeaderMap["competitionId"] - 1] === competitionId && 
+      if (row[regHeaderMap["competitionId"] - 1] === competitionId &&
+          (!categoryConfigId ||
+            row[regHeaderMap["competitionCategoryConfigId"] - 1] === categoryConfigId) &&
           row[regHeaderMap["recordStatus"] - 1] !== "DELETED" && 
           row[regHeaderMap["registrationStatus"] - 1] !== "REJECTED" && 
           row[regHeaderMap["registrationStatus"] - 1] !== "WITHDRAWN") {

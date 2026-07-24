@@ -695,6 +695,8 @@
           this.renderNotificationAdminQueuesView();
         } else if (hash === '#brand-settings') {
           this.renderBrandSettingsView();
+        } else if (hash === '#policy-center') {
+          this.renderPolicyCenterView();
         } else {
           this.renderLoginView();
         }
@@ -958,6 +960,10 @@
 
         if (permissions.includes('system.settings.update')) {
           navHtml += `
+            <a href="#policy-center" class="flex items-center space-x-3 px-3 py-2.5 rounded-xl text-sm font-medium text-slate-300 hover:bg-slate-900 hover:text-white transition">
+              <span class="material-icons-round text-slate-500">policy</span>
+              <span>ศูนย์นโยบายและกฎระบบ</span>
+            </a>
             <a href="#brand-settings" class="flex items-center space-x-3 px-3 py-2.5 rounded-xl text-sm font-medium text-slate-300 hover:bg-slate-900 hover:text-white transition">
               <span class="material-icons-round text-slate-500">palette</span>
               <span>แบรนด์และหน้าตาระบบ</span>
@@ -965,6 +971,74 @@
         }
 
         nav.innerHTML = navHtml;
+      },
+
+      async renderPolicyCenterView() {
+        const main = document.getElementById('main-content');
+        const select = (id, label, values) => `<label class="space-y-2"><span class="text-xs font-semibold text-slate-300">${label}</span><select id="${id}" class="w-full rounded-xl border border-slate-700 bg-slate-950/70 px-4 py-3 text-sm text-white">${values.map(v => `<option value="${v[0]}">${v[1]}</option>`).join('')}</select></label>`;
+        const toggle = (id, label, detail) => `<label class="flex items-start justify-between gap-4 rounded-2xl border border-slate-800 bg-slate-950/40 p-4"><span><span class="block text-sm font-semibold text-white">${label}</span><span class="mt-1 block text-xs leading-5 text-slate-500">${detail}</span></span><input id="${id}" type="checkbox" class="mt-1 h-5 w-5 accent-indigo-500"></label>`;
+        main.innerHTML = `
+          <div class="w-full max-w-6xl space-y-6">
+            <div class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+              <div><p class="text-[10px] font-bold uppercase tracking-[.2em] text-indigo-400">Governance control plane</p><h2 class="mt-1 text-2xl font-bold text-white">ศูนย์นโยบายและกฎระบบ</h2><p class="mt-1 text-xs text-slate-400">กำหนดกฎกลางให้การสมัคร ตารางแข่งขัน คะแนน การปลดล็อก และบัตรทำงานสอดคล้องกัน</p></div>
+              <div class="rounded-2xl border border-emerald-500/20 bg-emerald-500/5 px-4 py-3"><p class="text-[10px] uppercase tracking-wider text-emerald-400">ขอบเขตปัจจุบัน</p><p class="mt-1 text-sm font-semibold text-white">Tenant ของผู้ดูแลระบบ</p></div>
+            </div>
+            <form onsubmit="CMPE_UI.savePolicyCenter(event)" class="space-y-5">
+              <section class="rounded-3xl border border-slate-800 bg-slate-900/35 p-5 sm:p-6"><div class="mb-5 flex items-center gap-3"><span class="material-icons-round text-indigo-400">groups</span><div><h3 class="font-bold text-white">การสมัครและทีม</h3><p class="text-xs text-slate-500">ควบคุมการสมัครหลายกิจกรรมและข้อกำหนดรูปถ่าย</p></div></div><div class="grid gap-4 md:grid-cols-2">${toggle('policy-reg-multiple','สมัครได้หลายกิจกรรม','นักเรียนหนึ่งคนสามารถอยู่ในใบสมัครของหลายกิจกรรมได้')}${select('policy-reg-conflict','เมื่อเวลาการแข่งขันชนกัน',[['ALLOW','อนุญาต'],['WARN','เตือนและให้ยืนยัน'],['BLOCK','ไม่อนุญาต']])}${toggle('policy-student-photo','บังคับรูปนักเรียน','หากปิด ผู้ดูแลยังสามารถแนบรูปภายหลังได้')}${toggle('policy-coach-photo','บังคับรูปครูผู้ฝึกสอน','ใช้กับบัตรและการตรวจสอบตัวตน')}</div></section>
+              <section class="rounded-3xl border border-slate-800 bg-slate-900/35 p-5 sm:p-6"><div class="mb-5 flex items-center gap-3"><span class="material-icons-round text-pink-400">event_available</span><div><h3 class="font-bold text-white">ตารางแข่งขันและความขัดแย้ง</h3><p class="text-xs text-slate-500">กฎตรวจชนแยกตามนักเรียน ครู และกรรมการ</p></div></div><div class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">${select('policy-participant-conflict','นักเรียนตารางชน',[['ALLOW','อนุญาต'],['WARN','เตือน'],['BLOCK','บล็อก']])}${select('policy-coach-conflict','ครูตารางชน',[['ALLOW','อนุญาต'],['WARN','เตือน'],['BLOCK','บล็อก']])}${select('policy-judge-conflict','กรรมการตารางชน',[['ALLOW','อนุญาต'],['WARN','เตือน'],['BLOCK','บล็อก']])}<label class="space-y-2"><span class="text-xs font-semibold text-slate-300">เวลาเดินทางขั้นต่ำ (นาที)</span><input id="policy-travel-minutes" type="number" min="0" max="240" class="w-full rounded-xl border border-slate-700 bg-slate-950/70 px-4 py-3 text-sm text-white"></label></div><div class="mt-4">${toggle('policy-publish-complete','ตรวจความพร้อมก่อนเผยแพร่','ต้องมีห้อง กรรมการ และรายการแข่งขันครบก่อน Publish')}</div></section>
+              <section class="grid gap-5 lg:grid-cols-2"><div class="rounded-3xl border border-slate-800 bg-slate-900/35 p-5 sm:p-6"><div class="mb-5 flex items-center gap-3"><span class="material-icons-round text-amber-400">fact_check</span><h3 class="font-bold text-white">คะแนนและการปลดล็อก</h3></div><div class="grid gap-4 sm:grid-cols-2">${select('policy-score-method','วิธีรวมคะแนน',[['AVERAGE','ค่าเฉลี่ย'],['SUM','ผลรวม'],['MEDIAN','มัธยฐาน'],['TRIMMED_MEAN','ตัดค่าสูง/ต่ำ'],['WEIGHTED','ถ่วงน้ำหนัก']])}<label class="space-y-2"><span class="text-xs font-semibold text-slate-300">จำนวนผู้อนุมัติปลดล็อก</span><input id="policy-unlock-count" type="number" min="1" max="5" class="w-full rounded-xl border border-slate-700 bg-slate-950/70 px-4 py-3 text-sm text-white"></label>${toggle('policy-passfail','รองรับผ่าน/ไม่ผ่าน','เปิดเกณฑ์แบบ Pass/Fail')}${toggle('policy-rubric','รองรับ Rubric','เปิดการให้ระดับคุณภาพ')}</div></div><div class="rounded-3xl border border-slate-800 bg-slate-900/35 p-5 sm:p-6"><div class="mb-5 flex items-center gap-3"><span class="material-icons-round text-cyan-400">badge</span><h3 class="font-bold text-white">บัตรและการยืนยันตัวตน</h3></div><div class="space-y-4">${select('policy-photo-mode','รูปถ่ายบนบัตร',[['OPTIONAL','ไม่บังคับ แต่เว้นพื้นที่รูป'],['REQUIRED','บังคับมีรูป'],['DISABLED','ไม่ใช้รูป']])}<div class="grid gap-3 sm:grid-cols-2">${toggle('policy-qr-identity','QR ตรวจสอบตัวตน','เปิดหน้าตรวจสอบบุคคลจาก QR')}${toggle('policy-qr-checkin','QR รายงานตัวเข้าห้อง','เชื่อม QR เข้ากับ Check-in Log')}</div><div class="rounded-2xl border border-slate-800 p-4 text-xs text-slate-400"><b class="text-white">บทบาท:</b> นักเรียน · ครูผู้ฝึกสอน · กรรมการ<br><b class="text-white">รูปแบบพิมพ์:</b> A4 และบัตร PVC</div></div></div></section>
+              <div class="flex flex-col gap-3 rounded-3xl border border-indigo-500/20 bg-indigo-500/5 p-5 sm:flex-row sm:items-end sm:justify-between"><label class="flex-1 space-y-2"><span class="text-xs font-semibold text-slate-300">เหตุผลการเปลี่ยนแปลง</span><input id="policy-change-reason" required maxlength="300" placeholder="เช่น ปรับกฎสำหรับการแข่งขันปี 2569" class="w-full rounded-xl border border-slate-700 bg-slate-950/70 px-4 py-3 text-sm text-white"></label><button type="submit" class="rounded-xl bg-indigo-600 px-6 py-3 text-sm font-semibold text-white hover:bg-indigo-500">บันทึกและใช้กฎทันที</button></div>
+            </form>
+          </div>`;
+        try {
+          const policies = await CMPE_API.call('policy.get', {});
+          this.populatePolicyCenter(policies);
+        } catch (error) {
+          this.showToast(error.message || 'โหลดนโยบายไม่สำเร็จ', 'error');
+        }
+      },
+
+      populatePolicyCenter(p) {
+        const checked = (id, value) => { const e = document.getElementById(id); if (e) e.checked = Boolean(value); };
+        const value = (id, val) => { const e = document.getElementById(id); if (e) e.value = val; };
+        checked('policy-reg-multiple', p.registration.allowMultipleActivities);
+        value('policy-reg-conflict', p.registration.scheduleConflictPolicy);
+        checked('policy-student-photo', p.registration.requireStudentPhoto);
+        checked('policy-coach-photo', p.registration.requireCoachPhoto);
+        value('policy-participant-conflict', p.scheduling.participantConflictPolicy);
+        value('policy-coach-conflict', p.scheduling.coachConflictPolicy);
+        value('policy-judge-conflict', p.scheduling.judgeConflictPolicy);
+        value('policy-travel-minutes', p.scheduling.minimumTravelMinutes);
+        checked('policy-publish-complete', p.scheduling.publishRequiresCompleteAssignments);
+        value('policy-score-method', p.scoring.aggregationMethod);
+        value('policy-unlock-count', p.scoring.unlockApproverCount);
+        checked('policy-passfail', p.scoring.allowPassFail);
+        checked('policy-rubric', p.scoring.allowRubric);
+        value('policy-photo-mode', p.identity.photoMode);
+        checked('policy-qr-identity', p.identity.qrIdentityVerification);
+        checked('policy-qr-checkin', p.identity.qrRoomCheckin);
+      },
+
+      async savePolicyCenter(event) {
+        event.preventDefault();
+        const get = id => document.getElementById(id);
+        const payload = {
+          changeReason: get('policy-change-reason').value.trim(),
+          policies: {
+            registration: { allowMultipleActivities: get('policy-reg-multiple').checked, scheduleConflictPolicy: get('policy-reg-conflict').value, requireStudentPhoto: get('policy-student-photo').checked, requireCoachPhoto: get('policy-coach-photo').checked },
+            scheduling: { participantConflictPolicy: get('policy-participant-conflict').value, coachConflictPolicy: get('policy-coach-conflict').value, judgeConflictPolicy: get('policy-judge-conflict').value, minimumTravelMinutes: Number(get('policy-travel-minutes').value), publishRequiresCompleteAssignments: get('policy-publish-complete').checked },
+            scoring: { aggregationMethod: get('policy-score-method').value, decimalPrecision: 2, allowPassFail: get('policy-passfail').checked, allowRubric: get('policy-rubric').checked, unlockApproverCount: Number(get('policy-unlock-count').value), requireUnlockReason: true },
+            identity: { enabledRoles: ['STUDENT','COACH','JUDGE'], photoMode: get('policy-photo-mode').value, printFormats: ['A4','PVC'], qrIdentityVerification: get('policy-qr-identity').checked, qrRoomCheckin: get('policy-qr-checkin').checked }
+          }
+        };
+        try {
+          const saved = await CMPE_API.call('policy.update', payload);
+          this.populatePolicyCenter(saved);
+          get('policy-change-reason').value = '';
+          this.showToast('บันทึกนโยบายและเริ่มใช้แล้ว', 'success');
+        } catch (error) {
+          this.showToast(error.message || 'บันทึกนโยบายไม่สำเร็จ', 'error');
+        }
       },
 
       async renderBrandSettingsView() {

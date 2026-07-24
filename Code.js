@@ -252,6 +252,171 @@ function saveBrandSettings_(tenantId, payload) {
   return clean;
 }
 
+function defaultWorkflowPolicies_() {
+  return {
+    version: 1,
+    registration: {
+      allowMultipleActivities: true,
+      scheduleConflictPolicy: "WARN",
+      requireStudentPhoto: false,
+      requireCoachPhoto: false
+    },
+    scheduling: {
+      participantConflictPolicy: "WARN",
+      coachConflictPolicy: "WARN",
+      judgeConflictPolicy: "BLOCK",
+      minimumTravelMinutes: 15,
+      publishRequiresCompleteAssignments: true
+    },
+    scoring: {
+      aggregationMethod: "AVERAGE",
+      decimalPrecision: 2,
+      allowPassFail: true,
+      allowRubric: true,
+      unlockApproverCount: 1,
+      requireUnlockReason: true
+    },
+    identity: {
+      enabledRoles: ["STUDENT", "COACH", "JUDGE"],
+      photoMode: "OPTIONAL",
+      printFormats: ["A4", "PVC"],
+      qrIdentityVerification: true,
+      qrRoomCheckin: true
+    }
+  };
+}
+
+function normalizeWorkflowPolicies_(payload) {
+  const defaults = defaultWorkflowPolicies_();
+  const source = payload && payload.policies ? payload.policies : (payload || {});
+  const enumValue = function(value, allowed, fallback) {
+    return allowed.indexOf(value) !== -1 ? value : fallback;
+  };
+  const integerValue = function(value, minimum, maximum, fallback) {
+    const parsed = Number(value);
+    return Number.isInteger(parsed) && parsed >= minimum && parsed <= maximum
+      ? parsed : fallback;
+  };
+  const roles = ["STUDENT", "COACH", "JUDGE"].filter(function(role) {
+    return source.identity && Array.isArray(source.identity.enabledRoles) &&
+      source.identity.enabledRoles.indexOf(role) !== -1;
+  });
+  const formats = ["A4", "PVC"].filter(function(format) {
+    return source.identity && Array.isArray(source.identity.printFormats) &&
+      source.identity.printFormats.indexOf(format) !== -1;
+  });
+  return {
+    version: 1,
+    registration: {
+      allowMultipleActivities: source.registration
+        ? source.registration.allowMultipleActivities !== false
+        : defaults.registration.allowMultipleActivities,
+      scheduleConflictPolicy: enumValue(
+        source.registration && source.registration.scheduleConflictPolicy,
+        ["ALLOW", "WARN", "BLOCK"],
+        defaults.registration.scheduleConflictPolicy
+      ),
+      requireStudentPhoto: Boolean(source.registration && source.registration.requireStudentPhoto),
+      requireCoachPhoto: Boolean(source.registration && source.registration.requireCoachPhoto)
+    },
+    scheduling: {
+      participantConflictPolicy: enumValue(source.scheduling && source.scheduling.participantConflictPolicy, ["ALLOW", "WARN", "BLOCK"], defaults.scheduling.participantConflictPolicy),
+      coachConflictPolicy: enumValue(source.scheduling && source.scheduling.coachConflictPolicy, ["ALLOW", "WARN", "BLOCK"], defaults.scheduling.coachConflictPolicy),
+      judgeConflictPolicy: enumValue(source.scheduling && source.scheduling.judgeConflictPolicy, ["ALLOW", "WARN", "BLOCK"], defaults.scheduling.judgeConflictPolicy),
+      minimumTravelMinutes: integerValue(source.scheduling && source.scheduling.minimumTravelMinutes, 0, 240, defaults.scheduling.minimumTravelMinutes),
+      publishRequiresCompleteAssignments: source.scheduling
+        ? source.scheduling.publishRequiresCompleteAssignments !== false
+        : defaults.scheduling.publishRequiresCompleteAssignments
+    },
+    scoring: {
+      aggregationMethod: enumValue(source.scoring && source.scoring.aggregationMethod, ["AVERAGE", "SUM", "MEDIAN", "TRIMMED_MEAN", "WEIGHTED"], defaults.scoring.aggregationMethod),
+      decimalPrecision: integerValue(source.scoring && source.scoring.decimalPrecision, 0, 4, defaults.scoring.decimalPrecision),
+      allowPassFail: source.scoring ? source.scoring.allowPassFail !== false : true,
+      allowRubric: source.scoring ? source.scoring.allowRubric !== false : true,
+      unlockApproverCount: integerValue(source.scoring && source.scoring.unlockApproverCount, 1, 5, 1),
+      requireUnlockReason: source.scoring ? source.scoring.requireUnlockReason !== false : true
+    },
+    identity: {
+      enabledRoles: roles.length ? roles : defaults.identity.enabledRoles,
+      photoMode: enumValue(source.identity && source.identity.photoMode, ["OPTIONAL", "REQUIRED", "DISABLED"], defaults.identity.photoMode),
+      printFormats: formats.length ? formats : defaults.identity.printFormats,
+      qrIdentityVerification: source.identity ? source.identity.qrIdentityVerification !== false : true,
+      qrRoomCheckin: source.identity ? source.identity.qrRoomCheckin !== false : true
+    }
+  };
+}
+
+function workflowPolicyStorageKey_(tenantId, competitionId, categoryConfigId) {
+  const scope = categoryConfigId
+    ? "CATEGORY_" + categoryConfigId
+    : (competitionId ? "COMPETITION_" + competitionId : "TENANT");
+  return "WORKFLOW_POLICY_" + String(tenantId || "DEFAULT") + "_" + scope;
+}
+
+function getWorkflowPolicies_(tenantId, competitionId, categoryConfigId) {
+  const properties = PropertiesService.getScriptProperties();
+  const scopes = [
+    workflowPolicyStorageKey_(tenantId),
+    competitionId ? workflowPolicyStorageKey_(tenantId, competitionId) : "",
+    categoryConfigId ? workflowPolicyStorageKey_(tenantId, competitionId, categoryConfigId) : ""
+  ].filter(Boolean);
+  let merged = defaultWorkflowPolicies_();
+  scopes.forEach(function(key) {
+    const raw = properties.getProperty(key);
+    if (!raw) return;
+    try {
+      const value = JSON.parse(raw);
+      Object.keys(value).forEach(function(section) {
+        if (typeof value[section] === "object" && !Array.isArray(value[section])) {
+          merged[section] = Object.assign({}, merged[section] || {}, value[section]);
+        } else {
+          merged[section] = value[section];
+        }
+      });
+    } catch (error) {
+      console.warn("Invalid workflow policy ignored for " + key);
+    }
+  });
+  const normalized = normalizeWorkflowPolicies_(merged);
+  normalized.scope = {
+    tenantId: tenantId,
+    competitionId: competitionId || "",
+    competitionCategoryConfigId: categoryConfigId || "",
+    inheritance: categoryConfigId ? "CATEGORY" : (competitionId ? "COMPETITION" : "TENANT")
+  };
+  return normalized;
+}
+
+function saveWorkflowPolicies_(tenantId, payload, actor) {
+  const competitionId = String(payload.competitionId || "").trim();
+  const categoryConfigId = String(payload.competitionCategoryConfigId || "").trim();
+  if (categoryConfigId && !competitionId) {
+    throw new Error("ERR_POLICY_SCOPE: Competition is required for category policy.");
+  }
+  const clean = normalizeWorkflowPolicies_(payload);
+  const key = workflowPolicyStorageKey_(tenantId, competitionId, categoryConfigId);
+  PropertiesService.getScriptProperties().setProperty(key, JSON.stringify(clean));
+  new BaseRepository("audit_logs").create({
+    auditLogId: CMPE_UTILITIES.generateUuid(),
+    tenantId: tenantId,
+    timestamp: new Date().toISOString(),
+    actorUserId: actor.userId,
+    actorRoleCodesJson: JSON.stringify(actor.roles || []),
+    action: "UPDATE_WORKFLOW_POLICY",
+    entityType: "WORKFLOW_POLICY",
+    entityId: key,
+    previousValueJson: "",
+    newValueJson: JSON.stringify(clean),
+    reason: String(payload.changeReason || "Policy Center update").slice(0, 300),
+    requestId: "",
+    correlationId: "",
+    deviceId: "",
+    ipAddressHash: "",
+    result: "SUCCESS"
+  }, actor);
+  return getWorkflowPolicies_(tenantId, competitionId, categoryConfigId);
+}
+
 function jsonOutput_(value) {
   return ContentService.createTextOutput(JSON.stringify(value))
     .setMimeType(ContentService.MimeType.JSON);
@@ -418,6 +583,28 @@ function apiDispatcher(requestEnvelope) {
         return CMPE_UTILITIES.errorEnvelope("ERR_UNAUTHORIZED", "Missing system.settings.update permission", [], reqId);
       }
       return CMPE_UTILITIES.successEnvelope(saveBrandSettings_(tenantId, payload), reqId);
+    }
+
+    if (action === "policy.get") {
+      const policyActor = getSessionManager().verifySession(sessionToken, tenantId);
+      if (policyActor.permissions.indexOf("system.settings.update") === -1) {
+        return CMPE_UTILITIES.errorEnvelope("ERR_UNAUTHORIZED", "Missing system.settings.update permission", [], reqId);
+      }
+      return CMPE_UTILITIES.successEnvelope(
+        getWorkflowPolicies_(tenantId, payload.competitionId, payload.competitionCategoryConfigId),
+        reqId
+      );
+    }
+
+    if (action === "policy.update") {
+      const policyActor = getSessionManager().verifySession(sessionToken, tenantId);
+      if (policyActor.permissions.indexOf("system.settings.update") === -1) {
+        return CMPE_UTILITIES.errorEnvelope("ERR_UNAUTHORIZED", "Missing system.settings.update permission", [], reqId);
+      }
+      return CMPE_UTILITIES.successEnvelope(
+        saveWorkflowPolicies_(tenantId, payload, policyActor),
+        reqId
+      );
     }
 
     const isReadAction = action.endsWith(".list") ||
@@ -1292,6 +1479,32 @@ function apiDispatcher(requestEnvelope) {
         }
         const created = appSvc.addCoach(payload, actor);
         return CMPE_UTILITIES.successEnvelope(created, reqId);
+      }
+
+      if (action === "registration.substitutes.list") {
+        return CMPE_UTILITIES.successEnvelope(
+          subRepo.findByRegistration(payload.registrationId, actor.tenantId),
+          reqId
+        );
+      }
+      if (action === "registration.substitutes.add") {
+        if (actor.permissions.indexOf("registrationMember.manage") === -1) {
+          return CMPE_UTILITIES.errorEnvelope("ERR_UNAUTHORIZED", "Missing registrationMember.manage permission", [], reqId);
+        }
+        return CMPE_UTILITIES.successEnvelope(appSvc.addSubstitute(payload, actor), reqId);
+      }
+      if (action === "registration.attachments.list") {
+        return CMPE_UTILITIES.successEnvelope(
+          attachRepo.findByRegistration(payload.registrationId, actor.tenantId),
+          reqId
+        );
+      }
+      if (action === "registration.attachments.add") {
+        if (actor.permissions.indexOf("registrationMember.manage") === -1 &&
+            actor.permissions.indexOf("registrationCoach.manage") === -1) {
+          return CMPE_UTILITIES.errorEnvelope("ERR_UNAUTHORIZED", "Missing registration attachment permission", [], reqId);
+        }
+        return CMPE_UTILITIES.successEnvelope(appSvc.addAttachment(payload, actor), reqId);
       }
     }
 
