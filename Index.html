@@ -52,6 +52,28 @@
       background-attachment: fixed;
     }
 
+    html, body {
+      height: 100%;
+      overflow: hidden;
+    }
+
+    #app {
+      height: 100dvh;
+      min-height: 0;
+      overflow: hidden;
+    }
+
+    #app > header,
+    #app > footer {
+      flex: 0 0 auto;
+    }
+
+    #app-sidebar,
+    #main-content {
+      overscroll-behavior: contain;
+      scrollbar-gutter: stable;
+    }
+
     /* Auth screens stay centered; authenticated workspaces begin directly
        below the app bar so headings and tables are visible without dead space. */
     #app-sidebar:not(.hidden) + #main-content {
@@ -126,7 +148,7 @@
 <body class="text-slate-200 min-h-screen flex flex-col font-sans">
 
   <!-- APP SHELL -->
-  <div id="app" class="flex-grow flex flex-col">
+  <div id="app" class="flex flex-col">
     <!-- Header -->
     <header class="w-full border-b border-slate-800 bg-slate-950/80 backdrop-blur-md sticky top-0 z-40">
       <div class="w-full px-4 sm:px-6 py-3 flex items-center justify-between gap-3">
@@ -149,17 +171,17 @@
     </header>
 
     <!-- Content Workspace -->
-    <div class="flex-grow flex min-h-0">
+    <div class="flex min-h-0 flex-1 overflow-hidden">
       <button id="sidebar-backdrop" onclick="CMPE_UI.closeMobileSidebar()" class="fixed inset-0 top-[65px] z-40 hidden bg-slate-950/70 backdrop-blur-sm" aria-label="ปิดเมนู"></button>
       <!-- Sidebar Navigation (Hidden for non-logged-in) -->
-      <aside id="app-sidebar" class="w-64 shrink-0 overflow-y-auto border-r border-slate-900 bg-slate-950/95 p-4 space-y-2 hidden">
+      <aside id="app-sidebar" class="h-full w-64 shrink-0 overflow-x-hidden overflow-y-auto border-r border-slate-900 bg-slate-950/95 p-4 space-y-2 hidden">
         <nav class="space-y-1" id="sidebar-nav">
           <!-- Populated dynamically based on permissions -->
         </nav>
       </aside>
 
       <!-- Main Panel -->
-      <main id="main-content" class="flex-grow flex items-center justify-center p-8">
+      <main id="main-content" class="h-full min-w-0 flex-grow flex items-center justify-center overflow-y-auto p-8">
         <!-- Loading view by default -->
         <div id="loading-spinner" class="flex flex-col items-center space-y-4">
           <div class="w-12 h-12 border-4 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin"></div>
